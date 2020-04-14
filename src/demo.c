@@ -34,7 +34,7 @@ static double latency[iteration];
 
 double frame_timestamp[3];
 static int buff_index=0;
-int counter=0;
+int cnt=0;
 int sleep_time = 0;
 
 static double detect_start;
@@ -88,8 +88,8 @@ double gettimeafterboot()
 
 void *fetch_in_thread(void *ptr)
 {
-
 	buff_index = (buff_index + 1) % 3;
+
 	usleep(sleep_time*1000);
 
 	fetch_start = gettimeafterboot();
@@ -113,13 +113,13 @@ void *fetch_in_thread(void *ptr)
 
     //in_s = resize_image(in, net.w, net.h);
 
-	//printf("Image time stamp : %f\n", frame_timestamp[0]);
+	//printf("Image time stamp : %f\n", frame_timestamp[buff_index]);
 
 	fetch_time = gettimeafterboot() - fetch_start;
 
-	if(counter >= start_log){
-		fetch_array[counter-start_log]=fetch_time;
-		image_waiting_array[counter-start_log]=image_waiting_time;
+	if(cnt >= start_log){
+		fetch_array[cnt-start_log]=fetch_time;
+		image_waiting_array[cnt-start_log]=image_waiting_time;
 	}
 
 	printf("fetch_time : %f\n", fetch_time);
@@ -152,7 +152,7 @@ void *detect_in_thread(void *ptr)
 
 	detect_time = gettimeafterboot() - detect_start;
 
-	if(counter >= start_log) detect_array[counter-start_log]=detect_time;
+	if(cnt >= start_log) detect_array[cnt-start_log]=detect_time;
 
 	printf("Detect time : %f\n", detect_time);
     return 0;
@@ -271,6 +271,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     int send_http_post_once = 0;
     const double start_time_lim = get_time_point();
     double before = get_time_point();
+    double before_1 = gettimeafterboot();
     double start_time = get_time_point();
     float avg_fps = 0;
     int frame_counter = 0;
@@ -286,6 +287,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
 	for(int iter=0;iter<cycle;iter++){
 		while(1){
+			printf("================start================\n");
 			++count;
 			{
 				const float nms = .45;    // 0.4F
@@ -293,13 +295,17 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 				detection *local_dets = dets;
 
 				if (!benchmark) if (pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
-				if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
+				//if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
 
 				//if (nms) do_nms_obj(local_dets, local_nboxes, l.classes, nms);    // bad results
 				if (nms) {
 					if (l.nms_kind == DEFAULT_NMS) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
 					else diounms_sort(local_dets, local_nboxes, l.classes, nms, l.nms_kind, l.beta_nms);
 				}
+
+				detect_in_thread(0);
+
+				show_img = det_img;
 
 				double display_start = gettimeafterboot();
 				//printf("\033[2J");
@@ -370,7 +376,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
 				printf("display : %f\n", display_time);
 
-				pthread_join(detect_thread, 0);
+				//pthread_join(detect_thread, 0);
 				if (!benchmark) {
 					pthread_join(fetch_thread, 0);
 					free_image(det_s);
@@ -385,7 +391,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
 				if(delay == 0){
 					if(!benchmark) release_mat(&show_img);
-					show_img = det_img;
+					//show_img = det_img;
 				}
 				det_img = in_img;
 				det_s = in_s;
@@ -397,9 +403,14 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 				//double after = get_wall_time();
 				//float curr = 1./(after - before);
 				double after = get_time_point();    // more accurate time measurements
+				double after_1 = gettimeafterboot();    
 				float curr = 1000000. / (after - before);
-				fps = fps*0.9 + curr*0.1;
+				float curr_1 = (after_1 - before_1);
+				printf("FPS : %f\n",1000.0/curr_1);
+				//fps = fps*0.9 + curr*0.1;  
+				fps = 1000.0/curr_1;
 				before = after;
+				before_1 = after_1;
 
 				float spent_time = (get_time_point() - start_time) / 1000000;
 				frame_counter++;
@@ -411,23 +422,23 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 				}
 			}
 
-			if(counter>=start_log){
-				fps_array[counter-start_log]=fps;
-				latency[counter-start_log]=display_end-frame_timestamp[(buff_index+2)%3];
-				display_array[counter-start_log]=display_time;
-				slack[count-start_log]=(detect_time)-(sleep_time+fetch_time);
+			if(cnt>=start_log){
+				fps_array[cnt-start_log]=fps;
+				latency[cnt-start_log]=display_end-frame_timestamp[(buff_index+2)%3];
+				display_array[cnt-start_log]=display_time;
+				slack[cnt-start_log]=(detect_time)-(sleep_time+fetch_time);
 
-				printf("latency[%d]: %f\n",counter-start_log,latency[counter-start_log]);
-				printf("count : %d\n",counter);
+				printf("latency: %f\n",latency[cnt-start_log]);
+				printf("cnt : %d\n",cnt);
 			}
 
-			if(counter==(iteration+start_log-1)){
+			if(cnt==((iteration+start_log)-1)){
 				FILE *fp;
-				char s1[35]="single_cam/original";
+				char s1[35]="single_cam/SyncFetch";
 				char s2[4];
-				sprintf(s2,"%d",sleep_time);
+				//sprintf(s2,"%d",sleep_time);
 				char s3[5]=".csv";
-				strcat(s1,s2);
+				//strcat(s1,s2);
 				strcat(s1,s3);
 				
 				fp=fopen(s1,"w+");
@@ -447,10 +458,10 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
 				break;
 			}
-
-			counter++;
+			cnt++;
+			printf("================end===============\n");
 		}
-		counter = 0;
+		cnt = 0;
 	}
 	
 	//print average data

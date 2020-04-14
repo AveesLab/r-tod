@@ -645,16 +645,19 @@ extern "C" mat_cv* get_capture_frame_cv_with_timestamp(cap_cv *cap,double *frame
         mat = new cv::Mat();
         if (cap) {
             cv::VideoCapture &cpp_cap = *(cv::VideoCapture *)cap;
-			*(frame_timestamp+buff_index)=cpp_cap.get(cv::CAP_PROP_POS_MSEC);
-			//*(frame_timestamp)=cpp_cap.get(cv::CAP_PROP_POS_MSEC);
-			//printf("Image time stamp : %f\n", *(frame_timestamp+buff_index));
 			if (cpp_cap.isOpened())
             {
                 cpp_cap >> *mat;
+
+				*(frame_timestamp+buff_index)=cpp_cap.get(cv::CAP_PROP_POS_MSEC);
+				//printf("Image time stamp : %f\n", *(frame_timestamp+buff_index));
+
             }
             else std::cout << " Video-stream stopped! \n";
         }
         else cerr << " cv::VideoCapture isn't created \n";
+
+		
     }
     catch (...) {
         std::cout << " OpenCV exception: Video-stream stoped! \n";
