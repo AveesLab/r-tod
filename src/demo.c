@@ -34,8 +34,8 @@ static double latency[iteration];
 
 double frame_timestamp[3];
 static int buff_index=0;
+int sleep_time;
 int cnt=0;
-int sleep_time = 0;
 
 static double detect_start;
 static double detect_end;
@@ -90,6 +90,7 @@ void *fetch_in_thread(void *ptr)
 {
 	buff_index = (buff_index + 1) % 3;
 
+	printf("offset : %d\n", sleep_time);
 	usleep(sleep_time*1000);
 
 	fetch_start = gettimeafterboot();
@@ -169,7 +170,7 @@ double get_wall_time()
 
 void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
     int frame_skip, char *prefix, char *out_filename, int mjpeg_port, int json_port, int dont_show, int ext_output, int letter_box_in, int time_limit_sec, char *http_post_host,
-    int benchmark, int benchmark_layers, int opencv_buffer_size)
+    int benchmark, int benchmark_layers, int opencv_buffer_size, int offset)
 {
     letter_box = letter_box_in;
     in_img = det_img = show_img = NULL;
@@ -193,6 +194,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     srand(2222222);
 
 	printf("buffer_size : %d\n", opencv_buffer_size);
+	printf("offset : %d\n", offset);
 
     if(filename){
         printf("video file: %s\n", filename);
@@ -284,6 +286,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 	double fps_sum[cycle]={0};
 	double latency_sum[cycle]={0};
 
+	sleep_time = offset;
 
 	for(int iter=0;iter<cycle;iter++){
 		while(1){
@@ -426,7 +429,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 				fps_array[cnt-start_log]=fps;
 				latency[cnt-start_log]=display_end-frame_timestamp[(buff_index+2)%3];
 				display_array[cnt-start_log]=display_time;
-				slack[cnt-start_log]=(detect_time)-(sleep_time+fetch_time);
+				slack[cnt-start_log]=(detect_time + display_time)-(sleep_time+fetch_time);
 
 				printf("latency: %f\n",latency[cnt-start_log]);
 				printf("cnt : %d\n",cnt);
@@ -434,11 +437,11 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
 			if(cnt==((iteration+start_log)-1)){
 				FILE *fp;
-				char s1[35]="single_cam/SyncFetch";
+				char s1[35]="single_cam/offset_";
 				char s2[4];
-				//sprintf(s2,"%d",sleep_time);
+				sprintf(s2,"%d",sleep_time);
 				char s3[5]=".csv";
-				//strcat(s1,s2);
+				strcat(s1,s2);
 				strcat(s1,s3);
 				
 				fp=fopen(s1,"w+");
