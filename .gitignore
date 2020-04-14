@@ -33,6 +33,7 @@ build/detect_cuda_compute_capabilities.cu
 build/.ninja_deps
 build/.ninja_log
 build/Makefile
+signle_cam/
 
 # OS Generated #
 .DS_Store*
