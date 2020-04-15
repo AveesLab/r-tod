@@ -596,7 +596,7 @@ extern "C" cap_cv* get_capture_webcam_set_v4l2(int index, int opencv_buffer_size
 {
     cv::VideoCapture* cap = NULL;
     try {
-        cap = new cv::VideoCapture(index,1,opencv_buffer_size);
+        cap = new cv::VideoCapture(index,opencv_buffer_size);
         //cap->set(CV_CAP_PROP_FRAME_WIDTH, 1280);
         //cap->set(CV_CAP_PROP_FRAME_HEIGHT, 960);
     }
