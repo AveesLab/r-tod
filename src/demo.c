@@ -23,7 +23,7 @@
 
 #include "http_stream.h"
 
-/***************Add by wonseok******************/ 
+/***************Add******************/ 
 static double image_waiting_array[iteration];
 static double fetch_array[iteration];
 static double detect_array[iteration];
@@ -90,7 +90,7 @@ void *fetch_in_thread(void *ptr)
 {
 	buff_index = (buff_index + 1) % 3;
 
-	printf("offset : %d\n", sleep_time);
+	//printf("offset : %d\n", sleep_time);
 	usleep(sleep_time*1000);
 
 	fetch_start = gettimeafterboot();
@@ -193,8 +193,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     calculate_binary_weights(net);
     srand(2222222);
 
-	printf("buffer_size : %d\n", opencv_buffer_size);
-	printf("offset : %d\n", offset);
+	//printf("buffer_size : %d\n", opencv_buffer_size);
+	//printf("offset : %d\n", offset);
 
     if(filename){
         printf("video file: %s\n", filename);
