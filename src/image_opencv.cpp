@@ -591,7 +591,7 @@ extern "C" cap_cv* get_capture_webcam(int index)
     }
     return (cap_cv*)cap;
 }
-
+/*
 extern "C" cap_cv* get_capture_webcam_set_v4l2(int index, int opencv_buffer_size)
 {
     cv::VideoCapture* cap = NULL;
@@ -605,6 +605,7 @@ extern "C" cap_cv* get_capture_webcam_set_v4l2(int index, int opencv_buffer_size
     }
     return (cap_cv*)cap;
 }
+*/
 // ----------------------------------------
 
 extern "C" void release_capture(cap_cv* cap)
