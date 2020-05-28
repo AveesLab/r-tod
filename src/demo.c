@@ -8,6 +8,7 @@
 #include "image.h"
 #include "demo.h"
 #include "darknet.h"
+#include "v4l2.h"
 #ifdef WIN32
 #include <time.h>
 #include "gettimeofday.h"
@@ -19,12 +20,25 @@
 #define start_log 25
 #define cycle 1
 
+#define PARALLEL
+//#define SEQUENTIAL
+//#define CONTENTION_FREE 
+
+#define MEASURE "test/v3_PwQ.csv"
+
+#ifdef V4L2
+
+#include "v4l2.h"
+
+#endif
+
 #ifdef OPENCV
 
 #include "http_stream.h"
 
 /***************Add******************/ 
-//#define CONTENTION_FREE
+struct frame_data frame[3]; // v4l2 image data
+
 static double image_waiting_array[iteration];
 static double fetch_array[iteration];
 static double detect_array[iteration];
@@ -37,9 +51,11 @@ double frame_timestamp[3];
 static int buff_index=0;
 int sleep_time;
 int cnt=0;
+int display_index;
+int detect_index;
 
 pthread_mutex_t mutex_lock;
-int lock_offset = 10;
+int lock_offset = 5; // ms
 static double detect_start;
 static double detect_end;
 static double detect_time;
@@ -48,6 +64,7 @@ static double display_end;
 static double fetch_start;
 static double fetch_time;
 static double image_waiting_time;
+double select_time;
 /**********************************************/
 
 static char **demo_names;
@@ -91,9 +108,8 @@ double gettimeafterboot()
 
 void *fetch_in_thread(void *ptr)
 {
-	buff_index = (buff_index + 1) % 3;
 
-	//printf("offset : %d\n", sleep_time);
+	printf("offset : %d\n", sleep_time);
 	usleep(sleep_time*1000);
 
 #ifdef CONTENTION_FREE
@@ -106,22 +122,33 @@ void *fetch_in_thread(void *ptr)
     int dont_close_stream = 0;    // set 1 if your IP-camera periodically turns off and turns on video-stream
     if(letter_box)
         in_s = get_image_from_stream_letterbox(cap, net.w, net.h, net.c, &in_img, dont_close_stream);
-        //in_s = get_image_from_stream_letterbox_with_timestamp(cap, net.w, net.h, net.c, &in_img, dont_close_stream,frame_timestamp,buff_index);
     else{
-        //in_s = get_image_from_stream_resize(cap, net.w, net.h, net.c, &in_img, dont_close_stream);
-        in_s = get_image_from_stream_resize_with_timestamp(cap, net.w, net.h, net.c, &in_img, dont_close_stream, frame_timestamp, buff_index);
+#ifdef V4L2
+		frame[buff_index].frame = capture_image(&frame[buff_index]);
+		letterbox_image_into(frame[buff_index].frame, net.w, net.h, frame[buff_index].resize_frame);
+
+		if(!frame[buff_index].resize_frame.data){
+			printf("Stream closed.\n");
+			flag_exit = 1;
+			//exit(EXIT_FAILURE);
+			return 0;
+		}
+#else
+        in_s = get_image_from_stream_resize_with_timestamp(cap, net.w, net.h, net.c, &in_img, dont_close_stream, &frame[buff_index]);
+		if(!in_s.data){
+			printf("Stream closed.\n");
+			flag_exit = 1;
+			//exit(EXIT_FAILURE);
+			return 0;
+		}
+#endif
 	}
-    if(!in_s.data){
-        printf("Stream closed.\n");
-        flag_exit = 1;
-        //exit(EXIT_FAILURE);
-        return 0;
-    }
+
 #ifdef CONTENTION_FREE
 	pthread_mutex_unlock(&mutex_lock);
 #endif
 
-	image_waiting_time=frame_timestamp[buff_index]-fetch_start;
+	image_waiting_time = frame[buff_index].frame_timestamp-fetch_start;
 
     //in_s = resize_image(in, net.w, net.h);
 
@@ -146,24 +173,38 @@ void *detect_in_thread(void *ptr)
 	pthread_mutex_lock(&mutex_lock);
 #endif
 
+   // show_image_cv(det_img, "test");
 	detect_start = gettimeafterboot();
 	
     layer l = net.layers[net.n-1];
+#ifdef V4L2
+    float *X = frame[detect_index].resize_frame.data;
+#else
     float *X = det_s.data;
+#endif
     float *prediction = network_predict(net, X);
 
     memcpy(predictions[demo_index], prediction, l.outputs*sizeof(float));
     mean_arrays(predictions, NFRAMES, l.outputs, avg);
     l.output = avg;
 
-    cv_images[demo_index] = det_img;
+#ifndef V4L2
+	cv_images[demo_index] = det_img;
     det_img = cv_images[(demo_index + NFRAMES / 2 + 1) % NFRAMES];
+#endif
     demo_index = (demo_index + 1) % NFRAMES;
 
+#ifdef V4L2
+        //dets = get_network_boxes(&net, frame[buff_index].frame.w, frame[buff_index].frame.h, demo_thresh, demo_thresh, 0, 1, &nboxes, 0); // resized
+        dets = get_network_boxes(&net, net.w, net.h, demo_thresh, demo_thresh, 0, 1, &nboxes, 0); // resized
+        //dets = get_network_boxes(&net, net.w, net.h, demo_thresh, demo_thresh, 0, 1, &nboxes, 0); // resized
+#else
     if (letter_box)
         dets = get_network_boxes(&net, get_width_mat(in_img), get_height_mat(in_img), demo_thresh, demo_thresh, 0, 1, &nboxes, 1); // letter box
     else
         dets = get_network_boxes(&net, net.w, net.h, demo_thresh, demo_thresh, 0, 1, &nboxes, 0); // resized
+#endif
+
 #ifdef CONTENTION_FREE
 	pthread_mutex_unlock(&mutex_lock);
 #endif
@@ -175,6 +216,20 @@ void *detect_in_thread(void *ptr)
 	printf("Detect time : %f\n", detect_time);
     return 0;
 }
+
+#ifdef V4L2
+void *display_in_thread(void *ptr)
+{
+    int c = show_image_cv(frame[display_index].frame, "Demo");
+	
+	if (c == 27 || c == 1048603) // ESC - exit (OpenCV 2.x / 3.x)
+	{
+		flag_exit = 1;
+	}
+
+	return 0;
+}
+#endif
 
 double get_wall_time()
 {
@@ -190,8 +245,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     int benchmark, int benchmark_layers, int opencv_buffer_size, int offset)
 {
     letter_box = letter_box_in;
-    in_img = det_img = show_img = NULL;
-    //skip = frame_skip;
+	in_img = det_img = show_img = NULL;
+	//skip = frame_skip;
     image **alphabet = load_alphabet();
     int delay = frame_skip;
     demo_names = names;
@@ -218,16 +273,33 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         cap = get_capture_video_stream(filename);
     }else{
         printf("Webcam index: %d\n", cam_index);
+#ifdef V4L2
+		char cam_dev[20] = "/dev/video";
+		char index[2];
+		sprintf(index, "%d", cam_index);
+		strcat(cam_dev, index);
+		printf("cam dev : %s\n", cam_dev);
+
+		int frames = 30;
+		int w = 640;
+		int h = 480;
+		if(open_device(cam_dev, frames, w, h) < 0)
+		{
+			error("Couldn't connect to webcam.\n");
+
+		}
+#else
         cap = get_capture_webcam(cam_index);
         //cap = get_capture_webcam_set_v4l2(cam_index, opencv_buffer_size);
-    }
 
-    if (!cap) {
+		if (!cap) {
 #ifdef WIN32
-        printf("Check that you have copied file opencv_ffmpeg340_64.dll to the same directory where is darknet.exe \n");
+			printf("Check that you have copied file opencv_ffmpeg340_64.dll to the same directory where is darknet.exe \n");
 #endif
-        error("Couldn't connect to webcam.\n");
-    }
+			error("Couldn't connect to webcam.\n");
+		}
+#endif
+	}
 
     layer l = net.layers[net.n-1];
     int j;
@@ -246,14 +318,25 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     pthread_t fetch_thread;
     pthread_t detect_thread;
 
+#ifdef V4L2
+	frame[0].frame = capture_image(&frame[buff_index]);
+	frame[0].resize_frame = letterbox_image(frame[0].frame, net.w, net.h);
+
+	frame[1].frame = frame[0].frame;
+	frame[1].resize_frame = letterbox_image(frame[0].frame, net.w, net.h);
+
+	frame[2].frame = frame[0].frame;
+	frame[2].resize_frame = letterbox_image(frame[0].frame, net.w, net.h);
+
+#else
     fetch_in_thread(0);
     det_img = in_img;
-    det_s = in_s;
+	det_s = in_s;
 
 	fetch_in_thread(0);
     detect_in_thread(0);
     det_img = in_img;
-    det_s = in_s;
+	det_s = in_s;
 
     for (j = 0; j < NFRAMES / 2; ++j) {
 		free_detections(dets, nboxes);
@@ -262,21 +345,24 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         det_img = in_img;
         det_s = in_s;
     }
+#endif
 
     int count = 0;
     if(!prefix && !dont_show){
         int full_screen = 0;
         create_window_cv("Demo", full_screen, 1352, 1013);
+		//make_window("Demo", 1352, 1013, full_screen);
     }
-
 
     write_cv* output_video_writer = NULL;
     if (out_filename && !flag_exit)
     {
         int src_fps = 25;
         src_fps = get_stream_fps_cpp_cv(cap);
+#ifndef V4L2
         output_video_writer =
             create_video_writer(out_filename, 'D', 'I', 'V', 'X', src_fps, get_width_mat(det_img), get_height_mat(det_img), 1);
+#endif
 
         //'H', '2', '6', '4'
         //'D', 'I', 'V', 'X'
@@ -313,25 +399,63 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 			printf("================start================\n");
 			++count;
 			{
+#if (defined PARALLEL)
+				display_index = (buff_index + 1) %3;
+				detect_index = (buff_index + 2) %3;
+#elif (defined SEQUENTIAL)
+				display_index = (buff_index) %3;
+				detect_index = (buff_index) %3;
+#elif (defined CONTENTION_FREE)
+				display_index = (buff_index + 2) %3;
+				detect_index = (buff_index + 2) %3;
+#endif
 				const float nms = .45;    // 0.4F
 				int local_nboxes = nboxes;
 				detection *local_dets = dets;
 
+#ifndef SEQUENTIAL
+				/* Parallel or Contention free */
 				if (!benchmark) if (pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
-#ifndef CONTENTION_FREE
-				if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
 #endif
+
+#ifdef PARALLEL 
+				/* Sequential or Contention free */
+				if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
 				//if (nms) do_nms_obj(local_dets, local_nboxes, l.classes, nms);    // bad results
 				if (nms) {
 					if (l.nms_kind == DEFAULT_NMS) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
 					else diounms_sort(local_dets, local_nboxes, l.classes, nms, l.nms_kind, l.beta_nms);
 				}
-#ifdef CONTENTION_FREE
+#endif
+
+#ifdef SEQUENTIAL
+				fetch_in_thread(0);
+
+				det_img = in_img;
+				det_s = in_s;
+#endif
+
+#if (defined SEQUENTIAL || defined CONTENTION_FREE)
 				detect_in_thread(0);
 
+				if (nms) {
+					if (l.nms_kind == DEFAULT_NMS) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
+					else diounms_sort(local_dets, local_nboxes, l.classes, nms, l.nms_kind, l.beta_nms);
+				}
 				show_img = det_img;
 #endif
+
+				/* display thread */
+
 				double display_start = gettimeafterboot();
+#ifdef V4L2
+				image display = frame[display_index].frame;
+				if (!benchmark) draw_detections_v3(display, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
+				free_detections(local_dets, local_nboxes);
+				display_in_thread(0);
+#else
+				/* original display thread */
+
 				//printf("\033[2J");
 				//printf("\033[1;1H");
 				//printf("\nFPS:%.1f\n", fps);
@@ -353,6 +477,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 						if (time_limit_sec > 0) send_http_post_once = 1;
 					}
 				}
+				printf("here\n");
 
 				if (!benchmark) draw_detections_cv_v3(show_img, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
 				free_detections(local_dets, local_nboxes);
@@ -393,20 +518,27 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 					write_frame_cv(output_video_writer, show_img);
 					printf("\n cvWriteFrame \n");
 				}
+#endif
+				/* display end */
 
 				display_end = gettimeafterboot();
 
 				display_time = display_end - display_start; 
 
 				printf("display : %f\n", display_time);
+
 #ifndef CONTENTION_FREE
+				/* Prallel or Sequential */
 				pthread_join(detect_thread, 0);
 #endif
+
+#ifndef SEQUENTIAL
+				/* Parallel or Contention free */
 				if (!benchmark) {
 					pthread_join(fetch_thread, 0);
 					free_image(det_s);
 				}
-
+#endif
 				if (time_limit_sec > 0 && (get_time_point() - start_time_lim)/1000000 > time_limit_sec) {
 					printf(" start_time_lim = %f, get_time_point() = %f, time spent = %f \n", start_time_lim, get_time_point(), get_time_point() - start_time_lim);
 					break;
@@ -415,8 +547,13 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 				if (flag_exit == 1) break;
 
 				if(delay == 0){
+
+#ifndef V4L2
 					if(!benchmark) release_mat(&show_img);
+#endif
+
 #ifndef CONTENTION_FREE
+					/* Parallel or Sequential */
 					show_img = det_img;
 #endif
 				}
@@ -451,7 +588,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
 			if(cnt>=start_log){
 				fps_array[cnt-start_log]=fps;
-				latency[cnt-start_log]=display_end-frame_timestamp[(buff_index+2)%3];
+				latency[cnt-start_log]=display_end-frame[display_index].frame_timestamp;
 				display_array[cnt-start_log]=display_time;
 				slack[cnt-start_log]=(detect_time + display_time)-(sleep_time+fetch_time);
 
@@ -461,14 +598,15 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
 			if(cnt==((iteration+start_log)-1)){
 				FILE *fp;
-				char s1[35]="single_cam/offset_";
-				char s2[4];
-				sprintf(s2,"%d",sleep_time);
-				char s3[5]=".csv";
-				strcat(s1,s2);
-				strcat(s1,s3);
 				
-				fp=fopen(s1,"w+");
+				fp=fopen(MEASURE,"w+");
+
+				if(fp == NULL) 
+				{
+					fprintf(stderr, "ERROR Fail open file : < %s >\n", MEASURE);
+					fprintf(stderr, "Make directory\n");
+					return 0;
+				}
 
 				for(int i=0;i<iteration;i++){
 					image_waiting_sum[iter]+=image_waiting_array[i];
@@ -486,6 +624,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 				break;
 			}
 			cnt++;
+			buff_index = (buff_index + 1) % 3;
 			printf("================end===============\n");
 		}
 		cnt = 0;

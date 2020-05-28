@@ -32,6 +32,8 @@
 #endif
 #endif
 
+
+typedef void* mat_cv;
 #define SECRET_NUM -1234
 
 typedef enum { UNUSED_DEF_VAL } UNUSED_ENUM_TYPE;
@@ -1011,6 +1013,33 @@ void show_total_time();
 
 // gemm.h
 LIB_API void init_cpu();
+
+
+double gettimeafterboot();
+
+struct frame_data {
+	image frame;
+	image resize_frame;
+	void *p_frame;
+	size_t length;
+	double frame_timestamp;
+	int frame_sequence;
+};
+
+#ifndef V4L2_H
+#define V4L2_H
+
+static int xioctl(int fd, int request, void *arg);
+int print_caps(int fd, int w, int h);
+int init_mmap(int fd, int q_len);
+//image capture_image(double *frame_timestamp, int buff_index, int *frame_sequence, double *p_image, int *len);
+//image capture_image(struct frame_data *f, mat_cv** in_img, int w, int h, int c);
+image capture_image(struct frame_data *f);
+//void** capture_image(struct frame_data *f);
+int set_framerate(int fd, int fps);
+
+int open_device(char *cam_dev, int fps, int w, int h);
+#endif
 
 #ifdef __cplusplus
 }
