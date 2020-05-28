@@ -1,5 +1,6 @@
 #include "image_opencv.h"
 #include <iostream>
+#include "v4l2.h"
 
 #ifdef OPENCV
 #include "utils.h"
@@ -47,6 +48,7 @@ using std::endl;
 #define OCV_D
 #endif//DEBUG
 
+//#define V4L2
 
 // OpenCV libraries
 #ifndef CV_VERSION_EPOCH
@@ -76,6 +78,9 @@ using std::endl;
 #ifndef CV_AA
 #define CV_AA cv::LINE_AA
 #endif
+
+int buff_index = 0;
+cv::Mat mat_img[3];
 
 extern "C" {
 
@@ -211,8 +216,10 @@ extern "C" int get_height_mat(mat_cv *mat)
 extern "C" void release_mat(mat_cv **mat)
 {
     try {
+		printf("mat : %p\n", mat);
         cv::Mat **mat_ptr = (cv::Mat **)mat;
         if (*mat_ptr) delete *mat_ptr;
+		printf("here\n");
         *mat_ptr = NULL;
     }
     catch (...) {
@@ -267,6 +274,25 @@ extern "C" mat_cv *image_to_ipl(image im)
 }
 // ----------------------------------------
 
+
+// ----------------------------------------
+
+cv::Mat ipl_to_mat(IplImage *ipl)
+{
+    Mat m = cvarrToMat(ipl, true);
+    return m;
+}
+// ----------------------------------------
+
+IplImage *mat_to_ipl(cv::Mat mat)
+{
+    IplImage *ipl = new IplImage;
+    *ipl = mat;
+    return ipl;
+}
+// ----------------------------------------
+*/
+
 extern "C" image ipl_to_image(mat_cv* src_ptr)
 {
     IplImage* src = (IplImage*)src_ptr;
@@ -287,23 +313,6 @@ extern "C" image ipl_to_image(mat_cv* src_ptr)
     }
     return im;
 }
-// ----------------------------------------
-
-cv::Mat ipl_to_mat(IplImage *ipl)
-{
-    Mat m = cvarrToMat(ipl, true);
-    return m;
-}
-// ----------------------------------------
-
-IplImage *mat_to_ipl(cv::Mat mat)
-{
-    IplImage *ipl = new IplImage;
-    *ipl = mat;
-    return ipl;
-}
-// ----------------------------------------
-*/
 
 extern "C" cv::Mat image_to_mat(image img)
 {
@@ -432,7 +441,14 @@ static float get_pixel(image m, int x, int y, int c)
 }
 // ----------------------------------------
 
-extern "C" void show_image_cv(image p, const char *name)
+extern "C" int show_image_cv(image p, const char *name)
+//{
+//	cv::Mat m = image_to_mat(p);
+//	cv::imshow(name, m);
+//    int c = cv::waitKey(1);
+//    if (c != -1) c = c%256;
+//    //return c;
+//}
 {
     try {
         image copy = copy_image(p);
@@ -443,11 +459,15 @@ extern "C" void show_image_cv(image p, const char *name)
         else if (mat.channels() == 4) cv::cvtColor(mat, mat, cv::COLOR_RGBA2BGR);
         cv::namedWindow(name, cv::WINDOW_NORMAL);
         cv::imshow(name, mat);
-        free_image(copy);
+		int c = cv::waitKey(1);
+		free_image(copy);
+		
+		return c;
     }
     catch (...) {
         cerr << "OpenCV exception: show_image_cv \n";
     }
+	return 1;
 }
 // ----------------------------------------
 
@@ -640,7 +660,7 @@ extern "C" mat_cv* get_capture_frame_cv(cap_cv *cap) {
     return (mat_cv *)mat;
 }
 
-extern "C" mat_cv* get_capture_frame_cv_with_timestamp(cap_cv *cap,double *frame_timestamp, int buff_index) {
+extern "C" mat_cv* get_capture_frame_cv_with_timestamp(cap_cv *cap, struct frame_data *f) {
     cv::Mat *mat = NULL;
     try {
         mat = new cv::Mat();
@@ -648,10 +668,12 @@ extern "C" mat_cv* get_capture_frame_cv_with_timestamp(cap_cv *cap,double *frame
             cv::VideoCapture &cpp_cap = *(cv::VideoCapture *)cap;
 			if (cpp_cap.isOpened())
             {
-                cpp_cap >> *mat;
+				cpp_cap >> *mat;
 
-				*(frame_timestamp+buff_index)=cpp_cap.get(cv::CAP_PROP_POS_MSEC);
-				//printf("Image time stamp : %f\n", *(frame_timestamp+buff_index));
+				f->frame_timestamp = cpp_cap.get(CV_CAP_PROP_POS_MSEC);
+				f->frame_sequence = cpp_cap.get(CV_CAP_PROP_POS_FRAMES);
+				
+				printf("Image time stamp : %f\n", f->frame_timestamp);
 
             }
             else std::cout << " Video-stream stopped! \n";
@@ -663,6 +685,7 @@ extern "C" mat_cv* get_capture_frame_cv_with_timestamp(cap_cv *cap,double *frame
     catch (...) {
         std::cout << " OpenCV exception: Video-stream stoped! \n";
     }
+
     return (mat_cv *)mat;
 }
 // ----------------------------------------
@@ -829,7 +852,7 @@ extern "C" image get_image_from_stream_resize(cap_cv *cap, int w, int h, int c, 
     return im;
 }
 
-extern "C" image get_image_from_stream_resize_with_timestamp(cap_cv *cap, int w, int h, int c, mat_cv** in_img, int dont_close, double *frame_timestamp, int buff_index)
+extern "C" image get_image_from_stream_resize_with_timestamp(cap_cv *cap, int w, int h, int c, mat_cv** in_img, int dont_close, struct frame_data *f)
 {
     c = c ? c : 3;
     cv::Mat *src = NULL;
@@ -839,16 +862,14 @@ extern "C" image get_image_from_stream_resize_with_timestamp(cap_cv *cap, int w,
         once = 0;
         do {
             if (src) delete src;
-            src = (cv::Mat*)get_capture_frame_cv_with_timestamp(cap,frame_timestamp, buff_index);
-            if (!src) return make_empty_image(0, 0, 0);
+            src = (cv::Mat*)get_capture_frame_cv_with_timestamp(cap,f);
+			if (!src) return make_empty_image(0, 0, 0);
         } while (src->cols < 1 || src->rows < 1 || src->channels() < 1);
         printf("Video stream: %d x %d \n", src->cols, src->rows);
     }
     else
 		//src = (cv::Mat*)get_capture_frame_cv(cap);
-		src = (cv::Mat*)get_capture_frame_cv_with_timestamp(cap,frame_timestamp, buff_index);
-
-    if (!wait_for_stream(cap, src, dont_close)) return make_empty_image(0, 0, 0);
+		src = (cv::Mat*)get_capture_frame_cv_with_timestamp(cap, f);
 
     *(cv::Mat **)in_img = src;
 
@@ -861,6 +882,7 @@ extern "C" image get_image_from_stream_resize_with_timestamp(cap_cv *cap, int w,
     //show_image_mat(*in_img, "in_img");
     return im;
 }
+
 // ----------------------------------------
 
 extern "C" image get_image_from_stream_letterbox(cap_cv *cap, int w, int h, int c, mat_cv** in_img, int dont_close)

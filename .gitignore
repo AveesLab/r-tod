@@ -34,6 +34,7 @@ build/.ninja_deps
 build/.ninja_log
 build/Makefile
 signle_cam/
+*.nvvp
 
 # OS Generated #
 .DS_Store*
