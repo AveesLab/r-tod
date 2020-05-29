@@ -216,10 +216,8 @@ extern "C" int get_height_mat(mat_cv *mat)
 extern "C" void release_mat(mat_cv **mat)
 {
     try {
-		printf("mat : %p\n", mat);
         cv::Mat **mat_ptr = (cv::Mat **)mat;
         if (*mat_ptr) delete *mat_ptr;
-		printf("here\n");
         *mat_ptr = NULL;
     }
     catch (...) {
@@ -672,8 +670,8 @@ extern "C" mat_cv* get_capture_frame_cv_with_timestamp(cap_cv *cap, struct frame
 
 				f->frame_timestamp = cpp_cap.get(CV_CAP_PROP_POS_MSEC);
 				f->frame_sequence = cpp_cap.get(CV_CAP_PROP_POS_FRAMES);
-				
-				printf("Image time stamp : %f\n", f->frame_timestamp);
+
+				//printf("Image time stamp : %f\n", f->frame_timestamp);
 
             }
             else std::cout << " Video-stream stopped! \n";
@@ -885,6 +883,51 @@ extern "C" image get_image_from_stream_resize_with_timestamp(cap_cv *cap, int w,
 
 // ----------------------------------------
 
+extern "C" image get_image_from_v4l2(int w, int h, int c, mat_cv** in_img, int dont_close, struct frame_data *f)
+{
+    c = c ? c : 3;
+    cv::Mat *src = NULL;
+	image img;
+    static int once = 1;
+    if (once) {
+        once = 0;
+        do {
+            if (src) delete src;
+			printf("capture\n");
+			img = capture_image(f);
+			printf("capture\n");
+			show_image_cv(img, "im");
+			mat_img[buff_index] = image_to_mat(img);
+			src = (cv::Mat*)(mat_img + buff_index);
+
+            if (!src) return make_empty_image(0, 0, 0);
+        } while (src->cols < 1 || src->rows < 1 || src->channels() < 1);
+        printf("Video stream: %d x %d \n", src->cols, src->rows);
+    }
+    else
+	{
+		img = capture_image(f);
+		mat_img[buff_index] = image_to_mat(img);
+		src = (cv::Mat*)(mat_img + buff_index);
+	}
+
+    *in_img = (mat_cv *)new cv::Mat(src->rows, src->cols, CV_8UC(c));
+    cv::resize(*src, **(cv::Mat**)in_img, (*(cv::Mat**)in_img)->size(), 0, 0, cv::INTER_LINEAR);
+
+    if (c>1) cv::cvtColor(*src, *src, cv::COLOR_RGB2BGR);
+    image tmp = mat_to_image(*src);
+    image im = letterbox_image(tmp, w, h);
+    free_image(tmp);
+    release_mat((mat_cv **)&src);
+
+    //show_image_cv(im, "im");
+	buff_index = (buff_index + 1) % 3;
+	show_image_mat(*in_img, "in_img");
+    return im;
+}
+
+// ----------------------------------------
+
 extern "C" image get_image_from_stream_letterbox(cap_cv *cap, int w, int h, int c, mat_cv** in_img, int dont_close)
 {
     c = c ? c : 3;
@@ -1020,7 +1063,6 @@ extern "C" void draw_detections_cv_v3(mat_cv* mat, detection *dets, int num, flo
                 b.h = (b.h < 1) ? b.h : 1;
                 b.x = (b.x < 1) ? b.x : 1;
                 b.y = (b.y < 1) ? b.y : 1;
-                //printf("%f %f %f %f\n", b.x, b.y, b.w, b.h);
 
                 int left = (b.x - b.w / 2.)*show_img->cols;
                 int right = (b.x + b.w / 2.)*show_img->cols;
@@ -1045,6 +1087,7 @@ extern "C" void draw_detections_cv_v3(mat_cv* mat, detection *dets, int num, flo
                 pt1.y = top;
                 pt2.x = right;
                 pt2.y = bot;
+				//printf("%d, %d, %d, %d \n", left, top,right,bot);
                 pt_text.x = left;
                 pt_text.y = top - 4;// 12;
                 pt_text_bg1.x = left;

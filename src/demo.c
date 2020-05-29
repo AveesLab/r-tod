@@ -6,6 +6,7 @@
 #include "parser.h"
 #include "box.h"
 #include "image.h"
+#include "image_opencv.h"
 #include "demo.h"
 #include "darknet.h"
 #include "v4l2.h"
@@ -16,15 +17,37 @@
 #include <sys/time.h>
 #endif
 
-#define iteration 50
+#define iteration 1000
 #define start_log 25
 #define cycle 1
 
+/* CPU & GPU information */
+#define NUM_TRACE 4 /* GPU power, CPU power, GPU temperature, CPU temperature */
+#define GPU_POWER_PATH "/sys/bus/i2c/devices/1-0040/iio_device/in_power0_input"
+#define CPU_POWER_PATH "/sys/bus/i2c/devices/1-0040/iio_device/in_power1_input"
+#define GPU_TEMP_PATH "/sys/devices/virtual/thermal/thermal_zone1/temp"
+#define CPU_TEMP_PATH "/sys/devices/virtual/thermal/thermal_zone0/temp"
+
+#ifdef TRACE
+
+/* CPU & GPU information log */
+#define TRACE_PATH "trace"
+#define TRACE_FILE "/trace.csv"
+
+#endif
+
+/* architecture */
 #define PARALLEL
 //#define SEQUENTIAL
 //#define CONTENTION_FREE 
 
-#define MEASURE "test/v3_PwQ.csv"
+/* Measurement */
+#define MEASUREMENT_PATH "measure"
+#define MEASUREMENT_FILE "/measure.csv"
+
+/* calculate inter frame gap */
+#define GET_IFG(x,y) ((x) - (y)); \
+                     (y) = (x);
 
 #ifdef V4L2
 
@@ -36,7 +59,6 @@
 
 #include "http_stream.h"
 
-/***************Add******************/ 
 struct frame_data frame[3]; // v4l2 image data
 
 static double image_waiting_array[iteration];
@@ -46,6 +68,8 @@ static double display_array[iteration];
 static double slack[iteration];
 static double fps_array[iteration];
 static double latency[iteration];
+static double select_array[iteration];
+static int inter_frame_gap_array[iteration];
 
 double frame_timestamp[3];
 static int buff_index=0;
@@ -53,6 +77,19 @@ int sleep_time;
 int cnt=0;
 int display_index;
 int detect_index;
+
+int frame_sequence_tmp;
+int inter_frame_gap;
+
+#ifdef TRACE
+/* Check first iteration */
+int first_trace;
+
+/* Trace iteration */
+int trace_iter = 1;
+
+static double trace_array[NUM_TRACE][iteration];
+#endif
 
 pthread_mutex_t mutex_lock;
 int lock_offset = 5; // ms
@@ -65,7 +102,6 @@ static double fetch_start;
 static double fetch_time;
 static double image_waiting_time;
 double select_time;
-/**********************************************/
 
 static char **demo_names;
 static image **demo_alphabet;
@@ -109,8 +145,9 @@ double gettimeafterboot()
 void *fetch_in_thread(void *ptr)
 {
 
-	printf("offset : %d\n", sleep_time);
-	usleep(sleep_time*1000);
+	//printf("offset : %d\n", sleep_time);
+	/* Zero slack */
+	usleep(offset * 1000);
 
 #ifdef CONTENTION_FREE
 	usleep(lock_offset * 1000);
@@ -125,7 +162,10 @@ void *fetch_in_thread(void *ptr)
     else{
 #ifdef V4L2
 		frame[buff_index].frame = capture_image(&frame[buff_index]);
+		//printf("fetch w, h : %d, %d\n", frame[buff_index].frame.w, frame[buff_index].frame.h);
 		letterbox_image_into(frame[buff_index].frame, net.w, net.h, frame[buff_index].resize_frame);
+		//frame[buff_index].resize_frame = letterbox_image(frame[buff_index].frame, net.w, net.h);
+		//show_image_cv(frame[buff_index].resize_frame,"im");
 
 		if(!frame[buff_index].resize_frame.data){
 			printf("Stream closed.\n");
@@ -135,6 +175,7 @@ void *fetch_in_thread(void *ptr)
 		}
 #else
         in_s = get_image_from_stream_resize_with_timestamp(cap, net.w, net.h, net.c, &in_img, dont_close_stream, &frame[buff_index]);
+//        in_s = get_image_from_v4l2(net.w, net.h, net.c, &in_img, dont_close_stream, &frame[buff_index]);
 		if(!in_s.data){
 			printf("Stream closed.\n");
 			flag_exit = 1;
@@ -149,6 +190,7 @@ void *fetch_in_thread(void *ptr)
 #endif
 
 	image_waiting_time = frame[buff_index].frame_timestamp-fetch_start;
+	inter_frame_gap = GET_IFG(frame[buff_index].frame_sequence, frame_sequence_tmp);
 
     //in_s = resize_image(in, net.w, net.h);
 
@@ -159,6 +201,8 @@ void *fetch_in_thread(void *ptr)
 	if(cnt >= start_log){
 		fetch_array[cnt-start_log]=fetch_time;
 		image_waiting_array[cnt-start_log]=image_waiting_time;
+		select_array[cnt-start_log] = select_time;
+		inter_frame_gap_array[cnt-start_log] = inter_frame_gap;
 	}
 
 	printf("fetch_time : %f\n", fetch_time);
@@ -195,9 +239,7 @@ void *detect_in_thread(void *ptr)
     demo_index = (demo_index + 1) % NFRAMES;
 
 #ifdef V4L2
-        //dets = get_network_boxes(&net, frame[buff_index].frame.w, frame[buff_index].frame.h, demo_thresh, demo_thresh, 0, 1, &nboxes, 0); // resized
         dets = get_network_boxes(&net, net.w, net.h, demo_thresh, demo_thresh, 0, 1, &nboxes, 0); // resized
-        //dets = get_network_boxes(&net, net.w, net.h, demo_thresh, demo_thresh, 0, 1, &nboxes, 0); // resized
 #else
     if (letter_box)
         dets = get_network_boxes(&net, get_width_mat(in_img), get_height_mat(in_img), demo_thresh, demo_thresh, 0, 1, &nboxes, 1); // letter box
@@ -231,6 +273,54 @@ void *display_in_thread(void *ptr)
 }
 #endif
 
+#ifdef TRACE
+void *read_data()
+{
+	static int trace_sleep = 0;
+	//FILE *fp_cpu, *fp_gpu;
+	FILE *fp[NUM_TRACE];
+
+	int cpu_data;
+	int gpu_data;
+	int data[NUM_TRACE] = {0,}; // GPU power, CPU power, GPU temp, CPU temp
+	char path[NUM_TRACE][100] = {GPU_POWER_PATH, CPU_POWER_PATH, GPU_TEMP_PATH, CPU_TEMP_PATH};
+
+	if (!first_trace)
+	{
+		for (int i = 0; i < trace_iter; i++)
+		{
+			usleep(trace_sleep * 1000);
+
+			for(int k = 0; k < NUM_TRACE; k++)
+			{
+				fp[k] = fopen(path[k], "r");
+
+				if(fp[k] == NULL) printf("File open fail\n");
+
+				fscanf(fp[k], "%d", data + k);
+
+				//		printf("data : %d\n", data[k]);
+
+				fclose(fp[k]);
+			}
+
+			if (cnt >= start_log){
+				for (int j = 0; j < NUM_TRACE; j++) 
+					trace_array[j][(cnt - start_log) + i] = data[j];
+				//trace_array[j][(count - start_log)] = data[j];
+			}
+		}
+	}
+	else 
+	{
+		trace_sleep = (int)(1000. / fps) / 2.; 
+		printf("trace_sleep : %f\n", trace_sleep);
+		first_trace = 0;
+	}
+	return 0;
+}
+#endif
+
 double get_wall_time()
 {
     struct timeval walltime;
@@ -242,7 +332,7 @@ double get_wall_time()
 
 void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
     int frame_skip, char *prefix, char *out_filename, int mjpeg_port, int json_port, int dont_show, int ext_output, int letter_box_in, int time_limit_sec, char *http_post_host,
-    int benchmark, int benchmark_layers, int opencv_buffer_size, int offset)
+    int benchmark, int benchmark_layers, int offset)
 {
     letter_box = letter_box_in;
 	in_img = det_img = show_img = NULL;
@@ -290,7 +380,6 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 		}
 #else
         cap = get_capture_webcam(cam_index);
-        //cap = get_capture_webcam_set_v4l2(cam_index, opencv_buffer_size);
 
 		if (!cap) {
 #ifdef WIN32
@@ -317,6 +406,9 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
     pthread_t fetch_thread;
     pthread_t detect_thread;
+#ifdef TRACE
+    pthread_t trace_thread;
+#endif
 
 #ifdef V4L2
 	frame[0].frame = capture_image(&frame[buff_index]);
@@ -388,8 +480,10 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 	double slack_sum[cycle]={0};
 	double fps_sum[cycle]={0};
 	double latency_sum[cycle]={0};
+	double select_sum[cycle]={0};
+	double trace_data_sum[NUM_TRACE]={0};
+	int inter_frame_gap_sum[cycle]={0};
 
-	sleep_time = offset;
 #ifdef CONTENTION_FREE
 	pthread_mutex_init(&mutex_lock, NULL);
 #endif
@@ -399,6 +493,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 			printf("================start================\n");
 			++count;
 			{
+				/* Image index */
 #if (defined PARALLEL)
 				display_index = (buff_index + 1) %3;
 				detect_index = (buff_index + 2) %3;
@@ -418,6 +513,11 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 				if (!benchmark) if (pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
 #endif
 
+#ifdef TRACE
+				/* Trace CPU, GPU thermal, power */
+				if(pthread_create(&trace_thread, 0, read_data, 0)) error("Thread creation failed");
+#endif
+
 #ifdef PARALLEL 
 				/* Sequential or Contention free */
 				if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
@@ -429,6 +529,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 #endif
 
 #ifdef SEQUENTIAL
+				/* Sequential */
 				fetch_in_thread(0);
 
 				det_img = in_img;
@@ -436,6 +537,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 #endif
 
 #if (defined SEQUENTIAL || defined CONTENTION_FREE)
+				/* Sequential or Contention free*/
 				detect_in_thread(0);
 
 				if (nms) {
@@ -449,9 +551,11 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
 				double display_start = gettimeafterboot();
 #ifdef V4L2
-				image display = frame[display_index].frame;
-				if (!benchmark) draw_detections_v3(display, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
+				//if (!benchmark) draw_detections_v3(display, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
+				if (!benchmark) draw_detections_v3(frame[display_index].frame, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
 				free_detections(local_dets, local_nboxes);
+
+				/* Image display */
 				display_in_thread(0);
 #else
 				/* original display thread */
@@ -477,7 +581,6 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 						if (time_limit_sec > 0) send_http_post_once = 1;
 					}
 				}
-				printf("here\n");
 
 				if (!benchmark) draw_detections_cv_v3(show_img, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
 				free_detections(local_dets, local_nboxes);
@@ -530,6 +633,11 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 #ifndef CONTENTION_FREE
 				/* Prallel or Sequential */
 				pthread_join(detect_thread, 0);
+#endif
+
+#ifdef TRACE
+				/* TRACE end */
+				pthread_join(trace_thread, 0);
 #endif
 
 #ifndef SEQUENTIAL
@@ -590,22 +698,37 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 				fps_array[cnt-start_log]=fps;
 				latency[cnt-start_log]=display_end-frame[display_index].frame_timestamp;
 				display_array[cnt-start_log]=display_time;
-				slack[cnt-start_log]=(detect_time + display_time)-(sleep_time+fetch_time);
+				//slack[cnt-start_log]=(detect_time + display_time)-(sleep_time+fetch_time);
+				slack[cnt-start_log]=(detect_time)-(sleep_time+fetch_time);
 
 				printf("latency: %f\n",latency[cnt-start_log]);
 				printf("cnt : %d\n",cnt);
 			}
 
 			if(cnt==((iteration+start_log)-1)){
+				int exist=0;
 				FILE *fp;
-				
-				fp=fopen(MEASURE,"w+");
+				char file_path[100] = "";
 
-				if(fp == NULL) 
+				strcat(file_path, MEASUREMENT_PATH);
+				strcat(file_path, MEASUREMENT_FILE);
+
+				fp=fopen(file_path,"w+");
+
+				if (fp == NULL) 
 				{
-					fprintf(stderr, "ERROR Fail open file : < %s >\n", MEASURE);
-					fprintf(stderr, "Make directory\n");
-					return 0;
+					/* make directory */
+					while(!exist){
+						int result;
+
+						result = mkdir(MEASUREMENT_PATH, 0766);
+
+						if(result == 0) { 
+							exist = 1;
+
+							fp=fopen(file_path,"w+");
+						}
+					}
 				}
 
 				for(int i=0;i<iteration;i++){
@@ -616,11 +739,70 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 					slack_sum[iter]+=slack[i];
 					fps_sum[iter]+=fps_array[i];
 					latency_sum[iter]+=latency[i];
-					fprintf(fp,"%f,%f,%f,%f,%f,%f,%f\n",image_waiting_array[i],fetch_array[i],detect_array[i],display_array[i],slack[i],fps_array[i],latency[i]);
+					select_sum[iter]+=select_array[i];
+					inter_frame_gap_sum[iter]+=inter_frame_gap_array[i];
+
+					fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%d\n",image_waiting_array[i],fetch_array[i],detect_array[i],	display_array[i],slack[i],fps_array[i],latency[i], select_array[i], inter_frame_gap_array[i]);
+				}
+				fclose(fp);
+#ifdef TRACE
+				FILE *t_fp;
+				char t_file_path[100] = "";
+				int t_exist = 0;
+
+				strcat(t_file_path, TRACE_PATH);
+				strcat(t_file_path, TRACE_FILE);
+
+				printf("trace path : %s\n", t_file_path);
+				t_fp=fopen(t_file_path,"w+");
+
+				if (t_fp == NULL) 
+				{
+					/* make directory */
+					while(!t_exist){
+						int t_result;
+
+						t_result = mkdir(TRACE_PATH, 0766);
+
+						if(t_result == 0) {
+							/* success */
+							t_exist = 1;
+
+							t_fp=fopen(t_file_path,"w+");
+						}
+					}
 				}
 
-				fclose(fp);
+				for(int i = 0; i < trace_iter * iteration; i++) 
+				{
+					for(int k = 0; k < NUM_TRACE; k++) 
+					{
+						printf("%0.1f\n", trace_array[k][i]);
+						switch(k){
+							case 0:
+								fprintf(t_fp, "%0.1f,", trace_array[k][i]);
+								break;
+							case 1:
+								fprintf(t_fp, "%0.1f,", trace_array[k][i]);
+								break;
+							case 2:
+								trace_array[k][i] /= 1000.0;
+								fprintf(t_fp, "%0.1f,", trace_array[k][i]);
+								break;
+							case 3:
+								trace_array[k][i] /= 1000.0;
+								fprintf(t_fp, "%0.1f\n", trace_array[k][i]);
+								break;
+							default:
+								break;
+						}
+						trace_data_sum[k] += trace_array[k][i];
+					}
+				}
+				fclose(t_fp);
+#endif
 
+				/* exit loop */
 				break;
 			}
 			cnt++;
@@ -632,6 +814,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 	
 	//print average data
 	for(int k=0; k<cycle;k++){
+		printf("======== Darknet data ========\n");
 		printf("avg_image_waiting[%d] : %f\n",k,image_waiting_sum[k]/iteration);
 		printf("avg_fetch[%d] : %f\n",k,fetch_sum[k]/iteration);
 		printf("avg_detect[%d] : %f\n",k,detect_sum[k]/iteration);
@@ -639,6 +822,16 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 		printf("avg_slack[%d] : %f\n",k,slack_sum[k]/iteration);
 		printf("avg_fps[%d] : %f\n",k,fps_sum[k]/iteration);
 		printf("avg_latency[%d] : %f\n",k,latency_sum[k]/iteration);
+		printf("avg_select[%d] : %f\n",k,select_sum[k]/iteration);
+		printf("avg_inter_frame_gap[%d] : %f\n",k,(double)inter_frame_gap_sum[k]/iteration);
+#ifdef TRACE
+		printf("======== Power & Temperature ========\n");
+		printf("avg_gpu_power : %f\n", trace_data_sum[0]/(4*iteration));
+		printf("avg_cpu_power : %f\n", trace_data_sum[1]/(4*iteration));
+		printf("avg_gpu_temp : %f\n", trace_data_sum[2]/(4*iteration));
+		printf("avg_cpu_temp : %f\n", trace_data_sum[3]/(4*iteration));
+#endif
+
 	}
 
     printf("input video stream closed. \n");

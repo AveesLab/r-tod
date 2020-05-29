@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include <pthread.h>
+#include <unistd.h>
 
 #ifndef LIB_API
 #ifdef LIB_EXPORTS
