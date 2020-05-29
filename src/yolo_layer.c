@@ -764,10 +764,10 @@ int get_yolo_detections(layer l, int w, int h, int netw, int neth, float thresh,
     // Need to comment it in order to batch processing >= 2 images
     //if (l.batch == 2) avg_flipped_yolo(l);
     int count = 0;
-    for (i = 0; i < l.w*l.h; ++i){
+	for (i = 0; i < l.w*l.h; ++i){
         int row = i / l.w;
         int col = i % l.w;
-        for(n = 0; n < l.n; ++n){
+		for(n = 0; n < l.n; ++n){
             int obj_index  = entry_index(l, 0, n*l.w*l.h + i, 4);
             float objectness = predictions[obj_index];
             //if(objectness <= thresh) continue;    // incorrect behavior for Nan values
