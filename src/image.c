@@ -371,7 +371,6 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
             rgb[1] = green;
             rgb[2] = blue;
             box b = selected_detections[i].det.bbox;
-            //printf("%f %f %f %f\n", b.x, b.y, b.w, b.h);
 
             int left = (b.x - b.w / 2.)*im.w;
             int right = (b.x + b.w / 2.)*im.w;
@@ -411,6 +410,7 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
             }
             else {
                 draw_box_width(im, left, top, right, bot, width, red, green, blue); // 3 channels RGB
+//				printf("%d, %d, %d, %d \n", left, top,right,bot);
             }
             if (alphabet) {
                 char labelstr[4096] = { 0 };
@@ -1030,14 +1030,20 @@ void letterbox_image_into(image im, int w, int h, image boxed)
 {
     int new_w = im.w;
     int new_h = im.h;
-    if (((float)w / im.w) < ((float)h / im.h)) {
-        new_w = w;
-        new_h = (im.h * w) / im.w;
-    }
-    else {
-        new_h = h;
-        new_w = (im.w * h) / im.h;
-    }
+	//show_image_cv(im, "test");
+	//printf("image w, h : %d, %d\n", im.w, im.h);
+//    if (((float)w / im.w) < ((float)h / im.h)) {
+//        new_w = w;
+//        new_h = (im.h * w) / im.w;
+//    }
+//    else {
+//        new_h = h;
+//        new_w = (im.w * h) / im.h;
+//    }
+	
+	//printf("New image w, h : %d, %d\n", new_w, new_h);
+	new_h = h;
+	new_w = w;
     image resized = resize_image(im, new_w, new_h);
     embed_image(resized, boxed, (w - new_w) / 2, (h - new_h) / 2);
     free_image(resized);
