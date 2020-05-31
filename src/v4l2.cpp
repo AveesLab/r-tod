@@ -340,7 +340,6 @@ image capture_image(struct frame_data *f)
 			perror("Query Buffer");
 		}
 	}
-	
 	return im; /* return Image as darknet image type */
 
 }
