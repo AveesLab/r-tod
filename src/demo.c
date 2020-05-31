@@ -77,6 +77,7 @@ int sleep_time;
 int cnt=0;
 int display_index;
 int detect_index;
+int fetch_offset = 0; // zero slack
 
 int frame_sequence_tmp;
 int inter_frame_gap;
@@ -145,9 +146,10 @@ double gettimeafterboot()
 void *fetch_in_thread(void *ptr)
 {
 
-	//printf("offset : %d\n", sleep_time);
 	/* Zero slack */
-	usleep(offset * 1000);
+
+	//printf("Fetch offset : %d\n", fetch_offset);
+	usleep(fetch_offset * 1000);
 
 #ifdef CONTENTION_FREE
 	usleep(lock_offset * 1000);
@@ -356,7 +358,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     srand(2222222);
 
 	//printf("buffer_size : %d\n", opencv_buffer_size);
-	//printf("offset : %d\n", offset);
+	printf("offset : %d\n", offset);
+	fetch_offset = offset;
 
     if(filename){
         printf("video file: %s\n", filename);
