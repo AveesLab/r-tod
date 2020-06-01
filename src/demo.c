@@ -49,6 +49,8 @@
 #define GET_IFG(x,y) ((x) - (y)); \
                      (y) = (x);
 
+#define MAX(x,y) (((x) < (y) ? (y) : (x)))
+
 #ifdef V4L2
 
 #include "v4l2.h"
@@ -701,8 +703,17 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 				fps_array[cnt-start_log]=fps;
 				latency[cnt-start_log]=display_end-frame[display_index].frame_timestamp;
 				display_array[cnt-start_log]=display_time;
-				//slack[cnt-start_log]=(detect_time + display_time)-(sleep_time+fetch_time);
-				slack[cnt-start_log]=(detect_time)-(sleep_time+fetch_time);
+#ifdef PARALLEL
+				slack[cnt-start_log] = (MAX(MAX(fetch_time, detect_time), display_time))-(sleep_time+fetch_time);
+#endif
+
+#ifdef CONTENTION_FREE
+				slack[cnt-start_log] = (detect_time + display_time)-(sleep_time+fetch_time);
+#endif
+
+#ifdef SEQUENTIAL
+				slack[cnt-start_log] = .0;
+#endif
 
 				printf("latency: %f\n",latency[cnt-start_log]);
 				printf("cnt : %d\n",cnt);
