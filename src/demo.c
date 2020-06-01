@@ -17,9 +17,10 @@
 #include <sys/time.h>
 #endif
 
-#define iteration 1000
+#define iteration 100
 #define start_log 25
 #define cycle 1
+#define QLEN 4
 
 /* CPU & GPU information */
 #define NUM_TRACE 4 /* GPU power, CPU power, GPU temperature, CPU temperature */
@@ -40,15 +41,28 @@
 #define PARALLEL
 //#define SEQUENTIAL
 //#define CONTENTION_FREE 
+//define ZERO_SLACK
 
 /* Measurement */
-#define MEASUREMENT_PATH "measure"
-#define MEASUREMENT_FILE "/measure.csv"
+#define MEASUREMENT_PATH "zero_slack_v4"
+#define MEASUREMENT_FILE "/test.csv"
 
 /* calculate inter frame gap */
 #define GET_IFG(x,y) ((x) - (y)); \
                      (y) = (x);
 
+/* calculate cycle time */
+#if (defined PARALLEL)
+
+#define GET_FPS(x,y,z) ((x) + (y) + (z))/3
+
+#elif (defined OPTIMAL || defined I-ALONE || defined F-ALONE || defined D-ALONE)
+
+#define GET_FPS(x,y) ((x) + (y))/2
+
+#endif
+
+/* MAX */
 #define MAX(x,y) (((x) < (y) ? (y) : (x)))
 
 #ifdef V4L2
@@ -72,6 +86,7 @@ static double fps_array[iteration];
 static double latency[iteration];
 static double select_array[iteration];
 static int inter_frame_gap_array[iteration];
+static double cycle_time_array[iteration];
 
 double frame_timestamp[3];
 static int buff_index=0;
@@ -80,6 +95,9 @@ int cnt=0;
 int display_index;
 int detect_index;
 int fetch_offset = 0; // zero slack
+int cycle_index = 0;
+double cycle_array[QLEN] = {0,};
+int ondemand = 1;
 
 int frame_sequence_tmp;
 int inter_frame_gap;
@@ -105,6 +123,7 @@ static double fetch_start;
 static double fetch_time;
 static double image_waiting_time;
 double select_time;
+static double slack_time;
 
 static char **demo_names;
 static image **demo_alphabet;
@@ -145,13 +164,71 @@ double gettimeafterboot()
 	return (time_after_boot.tv_sec*1000+time_after_boot.tv_nsec*0.000001);
 }
 
+int check_on_demand()
+{
+	int env_var_int;
+	char *env_var;
+	static int size;
+	int on_demand;
+
+#if (defined V4L2)
+	env_var = getenv("V4L2_QLEN");
+#else
+	env_var = getenv("OPENCV_QLEN");
+#endif
+
+	if(env_var != NULL){
+		env_var_int = atoi(env_var);
+	}
+	else {
+		printf("Using DEFAULT V4L Queue Length\n");
+		env_var_int = 4;
+	}
+
+	switch(env_var_int){
+		case 0 :
+			on_demand = 1;
+			size = 1;
+			break;
+		case 1:
+			on_demand = 0;
+			size = 1;
+			break;
+		case 2:
+			on_demand = 0;
+			size = 2;
+			break;
+		case 3:
+			on_demand = 0;
+			size = 3;
+			break;
+		case 4:
+			on_demand = 0;
+			size = 4;
+			break;
+		default :
+			on_demand = 0;
+			size = 4;
+	}
+
+	printf("%d %d\n", on_demand, size);
+
+	return on_demand;
+}
+
 void *fetch_in_thread(void *ptr)
 {
 
+//	printf("Fetch offset : %d\n", fetch_offset);
+//	usleep(fetch_offset * 1000);
+
+#ifdef ZERO_SLACK
+
 	/* Zero slack */
 
-	//printf("Fetch offset : %d\n", fetch_offset);
+	printf("Fetch offset : %d\n", fetch_offset);
 	usleep(fetch_offset * 1000);
+#endif
 
 #ifdef CONTENTION_FREE
 	usleep(lock_offset * 1000);
@@ -194,6 +271,23 @@ void *fetch_in_thread(void *ptr)
 #endif
 
 	image_waiting_time = frame[buff_index].frame_timestamp-fetch_start;
+
+	if (image_waiting_time < .0)
+	{
+		for (int i = 1; i <= QLEN; i++)
+		{
+			image_waiting_time += cycle_array[(cycle_index + i) % QLEN];
+			//printf("cycle time : %f\n", cycle_array[(cycle_index + i) % QLEN]);
+
+			if ((.0 <= image_waiting_time) && (image_waiting_time <= (1000./30.))) break;
+			else if (image_waiting_time >= (1000./30.)) image_waiting_time = (1000./30.);
+
+			//printf("image waiting time : %f\n", image_waiting_time);
+		}
+
+		if (image_waiting_time <= (0.)) image_waiting_time = 1.;
+	}
+
 	inter_frame_gap = GET_IFG(frame[buff_index].frame_sequence, frame_sequence_tmp);
 
     //in_s = resize_image(in, net.w, net.h);
@@ -203,14 +297,17 @@ void *fetch_in_thread(void *ptr)
 	fetch_time = gettimeafterboot() - fetch_start;
 
 	if(cnt >= start_log){
-		fetch_array[cnt-start_log]=fetch_time;
-		image_waiting_array[cnt-start_log]=image_waiting_time;
+		if(ondemand) fetch_array[cnt-start_log] = fetch_time - image_waiting_time;
+		else fetch_array[cnt-start_log] = fetch_time;
+
+		image_waiting_array[cnt-start_log] = image_waiting_time;
 		select_array[cnt-start_log] = select_time;
 		inter_frame_gap_array[cnt-start_log] = inter_frame_gap;
-	}
 
-	printf("fetch_time : %f\n", fetch_time);
-	printf("image waiting time : %f\n", image_waiting_time);
+		//printf("select_time : %f\n", select_time);
+		printf("fetch_time : %f\n", fetch_array[cnt-start_log]);
+		printf("image waiting time : %f\n", image_waiting_time);
+	}
 
     return 0;
 }
@@ -415,6 +512,9 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     pthread_t trace_thread;
 #endif
 
+	ondemand = check_on_demand();
+	printf("ondemand : %d\n", ondemand);
+
 #ifdef V4L2
 	frame[0].frame = capture_image(&frame[buff_index]);
 	frame[0].resize_frame = letterbox_image(frame[0].frame, net.w, net.h);
@@ -488,6 +588,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 	double select_sum[cycle]={0};
 	double trace_data_sum[NUM_TRACE]={0};
 	int inter_frame_gap_sum[cycle]={0};
+	double cycle_time_sum[cycle]={0};
+	double fps_buff[3];
 
 #ifdef CONTENTION_FREE
 	pthread_mutex_init(&mutex_lock, NULL);
@@ -672,6 +774,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 				}
 				det_img = in_img;
 				det_s = in_s;
+
 			}
 			--delay;
 			if(delay < 0){
@@ -689,6 +792,17 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 				before = after;
 				before_1 = after_1;
 
+				fps_buff[display_index] = fps;
+				//for(int k = 0; k < 3; k++) printf("fps_buff[%d] : %f\n", k, fps_buff[k]);
+
+#if (defined PARALLEL)
+				fps = GET_FPS(fps_buff[buff_index], fps_buff[detect_index], fps_buff[display_index]);
+#elif (defined OPTIMAL || defined I-ALONE || defined F-ALONE || defined D-ALONE)
+				fps = GET_FPS(fps_buff[buff_index], fps_buff[display_index]);
+#elif (defined SEQUENTIAL)
+				fps = fps_buff[display_index];
+#endif
+
 				float spent_time = (get_time_point() - start_time) / 1000000;
 				frame_counter++;
 				if (spent_time >= 3.0f) {
@@ -699,29 +813,40 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 				}
 			}
 
-			if(cnt>=start_log){
-				fps_array[cnt-start_log]=fps;
-				latency[cnt-start_log]=display_end-frame[display_index].frame_timestamp;
-				display_array[cnt-start_log]=display_time;
-#ifdef PARALLEL
-				slack[cnt-start_log] = (MAX(MAX(fetch_time, detect_time), display_time))-(fetch_offset+fetch_time);
+			cycle_array[cycle_index] = 1000./fps;
+
+			cycle_index = (cycle_index + 1) % 4;
+
+#if (defined PARALLEL || defined ZERO_SLACK)
+				slack_time = (MAX(detect_time, display_time))-(fetch_offset+fetch_time);
+#elif (defined CONTENTION_FREE)
+				slack_time = (display_time)-(fetch_time);
+#elif (defined SEQUENTIAL)
+				slack_time = .0;
 #endif
 
-#ifdef CONTENTION_FREE
-				slack[cnt-start_log] = (display_time)-(fetch_time);
+#ifdef ZERO_SLACK
+
+				if(((-10.0) > slack_time) || (10.0 < slack_time)) fetch_offset += slack_time;
 #endif
 
-#ifdef SEQUENTIAL
-				slack[cnt-start_log] = .0;
-#endif
+				printf("slack: %f\n",slack_time);
 
-				printf("latency: %f\n",latency[cnt-start_log]);
-				printf("cnt : %d\n",cnt);
-			}
+				if(cnt>=start_log){
+					fps_array[cnt-start_log] = fps;
+					cycle_time_array[cnt-start_log] = 1000./fps;
+					latency[cnt-start_log]=display_end-frame[display_index].frame_timestamp;
+					display_array[cnt-start_log]=display_time;
+					slack[cnt - start_log] = slack_time;
 
-			if(cnt==((iteration+start_log)-1)){
-				int exist=0;
-				FILE *fp;
+					printf("slack: %f\n",slack[cnt-start_log]);
+					printf("latency: %f\n",latency[cnt-start_log]);
+					printf("cnt : %d\n",cnt);
+				}
+
+				if(cnt==((iteration+start_log)-1)){
+					int exist=0;
+					FILE *fp;
 				char file_path[100] = "";
 
 				strcat(file_path, MEASUREMENT_PATH);
@@ -745,6 +870,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 					}
 				}
 
+				fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n","b_w", "e_f", "e_i","e_d", "slack", "fps", "latency", "select", "ifg", "cycle_time");
+
 				for(int i=0;i<iteration;i++){
 					image_waiting_sum[iter]+=image_waiting_array[i];
 					fetch_sum[iter]+=fetch_array[i];
@@ -755,8 +882,9 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 					latency_sum[iter]+=latency[i];
 					select_sum[iter]+=select_array[i];
 					inter_frame_gap_sum[iter]+=inter_frame_gap_array[i];
+					cycle_time_sum[iter]+=cycle_time_array[cnt-start_log];
 
-					fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%d\n",image_waiting_array[i],fetch_array[i],detect_array[i],	display_array[i],slack[i],fps_array[i],latency[i], select_array[i], inter_frame_gap_array[i]);
+					fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%d,%f\n",image_waiting_array[i],fetch_array[i],detect_array[i],	display_array[i],slack[i],fps_array[i],latency[i], select_array[i], inter_frame_gap_array[i], cycle_time_array[i]);
 				}
 				fclose(fp);
 #ifdef TRACE
@@ -838,6 +966,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 		printf("avg_latency[%d] : %f\n",k,latency_sum[k]/iteration);
 		printf("avg_select[%d] : %f\n",k,select_sum[k]/iteration);
 		printf("avg_inter_frame_gap[%d] : %f\n",k,(double)inter_frame_gap_sum[k]/iteration);
+		printf("avg_cycle_time[%d] : %f\n",k,cycle_time_sum[k]/iteration);
 #ifdef TRACE
 		printf("======== Power & Temperature ========\n");
 		printf("avg_gpu_power : %f\n", trace_data_sum[0]/(4*iteration));

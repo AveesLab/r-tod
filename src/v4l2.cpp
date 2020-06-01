@@ -501,7 +501,7 @@ int get_v4l2_buffer_size()
 			size = 4;
 	}
 
-	printf("%d %d\n", on_demand, size);
+	//printf("%d %d\n", on_demand, size);
 
 	return size;
 }
