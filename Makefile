@@ -7,9 +7,10 @@ OPENMP=0
 LIBSO=0
 ZED_CAMERA=0 # ZED SDK 3.0 and above
 ZED_CAMERA_v2_8=0 # ZED SDK 2.X
-V4L2=1
+V4L2=0
 TRACE=0
 FIFO=0
+CPU_AFFINITY=0
 
 # set GPU=1 and CUDNN=1 to speedup on GPU
 # set CUDNN_HALF=1 to further speedup 3 x times (Mixed-precision on Tensor Cores) GPU: Volta, Xavier, Turing and higher
@@ -69,6 +70,10 @@ OPTS=-Ofast
 LDFLAGS= -lm -pthread -lrt
 COMMON= -Iinclude/ -I3rdparty/stb/include
 CFLAGS=-Wall -Wfatal-errors -Wno-unused-result -Wno-unknown-pragmas -fPIC -Wextra -pedantic
+
+ifeq ($(CPU_AFFINITY), 1)
+CFLAGS+= -DCPU_AFFINITY
+endif
 
 ifeq ($(FIFO), 1)
 CFLAGS+= -DFIFO

@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "network.h"
 #include "detection_layer.h"
 #include "region_layer.h"
@@ -10,6 +11,8 @@
 #include "demo.h"
 #include "darknet.h"
 #include "v4l2.h"
+#include "sched_utils.h"
+#include <sched.h>
 #ifdef WIN32
 #include <time.h>
 #include "gettimeofday.h"
@@ -17,7 +20,7 @@
 #include <sys/time.h>
 #endif
 
-#define iteration 100
+#define iteration 1000
 #define start_log 25
 #define cycle 1
 #define QLEN 4
@@ -29,27 +32,27 @@
 #define GPU_TEMP_PATH "/sys/devices/virtual/thermal/thermal_zone1/temp"
 #define CPU_TEMP_PATH "/sys/devices/virtual/thermal/thermal_zone0/temp"
 
-#ifdef TRACE
-
-/* CPU & GPU information log */
-#define TRACE_PATH "trace"
-#define TRACE_FILE "/trace.csv"
-
-#endif
-
 /* architecture */
 #define PARALLEL
 //#define SEQUENTIAL
 //#define CONTENTION_FREE 
-//define ZERO_SLACK
+//#define ZERO_SLACK
 
+#ifndef FIFO
 /* Measurement */
-#define MEASUREMENT_PATH "zero_slack_v4"
-#define MEASUREMENT_FILE "/test.csv"
+#define MEASUREMENT_PATH "measure"
+#define MEASUREMENT_FILE "/measure.csv"
+#endif
+
+#ifdef FIFO
+/* Measurement */
+#define MEASUREMENT_PATH "measure"
+#define MEASUREMENT_FILE "/measure_FIFO.csv"
+#endif
 
 /* calculate inter frame gap */
 #define GET_IFG(x,y) ((x) - (y)); \
-                     (y) = (x);
+    (y) = (x);
 
 /* calculate cycle time */
 #if (defined PARALLEL)
@@ -87,6 +90,13 @@ static double latency[iteration];
 static double select_array[iteration];
 static int inter_frame_gap_array[iteration];
 static double cycle_time_array[iteration];
+static int num_object_array[iteration];
+static double transfer_delay_array[iteration];
+static double F_wakeup_delay_array[iteration];
+static double I_wakeup_delay_array[iteration];
+static double D_wakeup_delay_array[iteration];
+static double D_wakeup_delay_array[iteration];
+static double draw_bbox_array[iteration];
 
 double frame_timestamp[3];
 static int buff_index=0;
@@ -98,11 +108,11 @@ int fetch_offset = 0; // zero slack
 int cycle_index = 0;
 double cycle_array[QLEN] = {0,};
 int ondemand = 1;
+int num_object = 0;
 
 int frame_sequence_tmp;
 int inter_frame_gap;
 
-#ifdef TRACE
 /* Check first iteration */
 int first_trace;
 
@@ -110,7 +120,6 @@ int first_trace;
 int trace_iter = 1;
 
 static double trace_array[NUM_TRACE][iteration];
-#endif
 
 pthread_mutex_t mutex_lock;
 int lock_offset = 5; // ms
@@ -124,6 +133,12 @@ static double fetch_time;
 static double image_waiting_time;
 double select_time;
 static double slack_time;
+static double cycle_end;
+static double transfer_delay;
+static double F_wakeup_delay;
+static double I_wakeup_delay;
+static double D_wakeup_delay;
+static double draw_bbox_time;
 
 static char **demo_names;
 static image **demo_alphabet;
@@ -159,168 +174,235 @@ static int letter_box = 0;
 
 double gettimeafterboot()
 {
-	struct timespec time_after_boot;
-	clock_gettime(CLOCK_MONOTONIC,&time_after_boot);
-	return (time_after_boot.tv_sec*1000+time_after_boot.tv_nsec*0.000001);
+    struct timespec time_after_boot;
+    clock_gettime(CLOCK_MONOTONIC,&time_after_boot);
+    return (time_after_boot.tv_sec*1000+time_after_boot.tv_nsec*0.000001);
 }
 
 int check_on_demand()
 {
-	int env_var_int;
-	char *env_var;
-	static int size;
-	int on_demand;
+    int env_var_int;
+    char *env_var;
+    static int size;
+    int on_demand;
 
 #if (defined V4L2)
-	env_var = getenv("V4L2_QLEN");
+    env_var = getenv("V4L2_QLEN");
 #else
-	env_var = getenv("OPENCV_QLEN");
+    env_var = getenv("OPENCV_QLEN");
 #endif
 
-	if(env_var != NULL){
-		env_var_int = atoi(env_var);
-	}
-	else {
-		printf("Using DEFAULT V4L Queue Length\n");
-		env_var_int = 4;
-	}
+    if(env_var != NULL){
+        env_var_int = atoi(env_var);
+    }
+    else {
+        printf("Using DEFAULT V4L Queue Length\n");
+        env_var_int = 4;
+    }
 
-	switch(env_var_int){
-		case 0 :
-			on_demand = 1;
-			size = 1;
-			break;
-		case 1:
-			on_demand = 0;
-			size = 1;
-			break;
-		case 2:
-			on_demand = 0;
-			size = 2;
-			break;
-		case 3:
-			on_demand = 0;
-			size = 3;
-			break;
-		case 4:
-			on_demand = 0;
-			size = 4;
-			break;
-		default :
-			on_demand = 0;
-			size = 4;
-	}
+    switch(env_var_int){
+        case 0 :
+            on_demand = 1;
+            size = 1;
+            break;
+        case 1:
+            on_demand = 0;
+            size = 1;
+            break;
+        case 2:
+            on_demand = 0;
+            size = 2;
+            break;
+        case 3:
+            on_demand = 0;
+            size = 3;
+            break;
+        case 4:
+            on_demand = 0;
+            size = 4;
+            break;
+        default :
+            on_demand = 0;
+            size = 4;
+    }
 
-	printf("%d %d\n", on_demand, size);
-
-	return on_demand;
+    return on_demand;
 }
 
 void *fetch_in_thread(void *ptr)
 {
 
-//	printf("Fetch offset : %d\n", fetch_offset);
-//	usleep(fetch_offset * 1000);
+#ifdef FIFO
+    /* SCHED FIFO */
+
+    struct sched_param param, new_param;
+
+    param.sched_priority = 99;
+
+    if(sched_setscheduler(0, SCHED_FIFO, &param) != 0)
+    {
+        perror("sched_setscheduler failed\n");
+        return ;
+    }
+
+    //printf("Fetch policy = %d\n", sched_getscheduler(0));
+#endif
+
+#ifdef CPU_AFFINITY
+    /* Set CPU 1 */
+    cpu_set_t mask;
+
+    CPU_ZERO(&mask);
+    CPU_SET(1, &mask);
+
+    if (sched_setaffinity(0, sizeof(cpu_set_t), &mask) == -1)
+    {
+        perror("sched_setaffinity");
+    }
+//    printf("Fetch cpu : %d\n", sched_getcpu());
+#endif
+
+    //	usleep(fetch_offset * 1000);
 
 #ifdef ZERO_SLACK
 
-	/* Zero slack */
+    /* Zero slack */
 
-	printf("Fetch offset : %d\n", fetch_offset);
-	usleep(fetch_offset * 1000);
+    //printf("Fetch offset : %d\n", fetch_offset);
+    usleep(fetch_offset * 1000);
 #endif
 
 #ifdef CONTENTION_FREE
-	usleep(lock_offset * 1000);
-	pthread_mutex_lock(&mutex_lock);
+    usleep(lock_offset * 1000);
+    pthread_mutex_lock(&mutex_lock);
 #endif
 
-	fetch_start = gettimeafterboot();
+    fetch_start = gettimeafterboot();
+
+    F_wakeup_delay = fetch_start - cycle_end;
+    //printf("Fetch wakeup delay : %f\n", F_wakeup_delay);
+    printf("Fetch start : %f\n", fetch_start);
+
 
     int dont_close_stream = 0;    // set 1 if your IP-camera periodically turns off and turns on video-stream
     if(letter_box)
         in_s = get_image_from_stream_letterbox(cap, net.w, net.h, net.c, &in_img, dont_close_stream);
     else{
 #ifdef V4L2
-		frame[buff_index].frame = capture_image(&frame[buff_index]);
-		//printf("fetch w, h : %d, %d\n", frame[buff_index].frame.w, frame[buff_index].frame.h);
-		letterbox_image_into(frame[buff_index].frame, net.w, net.h, frame[buff_index].resize_frame);
-		//frame[buff_index].resize_frame = letterbox_image(frame[buff_index].frame, net.w, net.h);
-		//show_image_cv(frame[buff_index].resize_frame,"im");
+        frame[buff_index].frame = capture_image(&frame[buff_index]);
+        letterbox_image_into(frame[buff_index].frame, net.w, net.h, frame[buff_index].resize_frame);
+        //frame[buff_index].resize_frame = letterbox_image(frame[buff_index].frame, net.w, net.h);
+        //show_image_cv(frame[buff_index].resize_frame,"im");
 
-		if(!frame[buff_index].resize_frame.data){
-			printf("Stream closed.\n");
-			flag_exit = 1;
-			//exit(EXIT_FAILURE);
-			return 0;
-		}
+        if(!frame[buff_index].resize_frame.data){
+            printf("Stream closed.\n");
+            flag_exit = 1;
+            //exit(EXIT_FAILURE);
+            return 0;
+        }
 #else
         in_s = get_image_from_stream_resize_with_timestamp(cap, net.w, net.h, net.c, &in_img, dont_close_stream, &frame[buff_index]);
-//        in_s = get_image_from_v4l2(net.w, net.h, net.c, &in_img, dont_close_stream, &frame[buff_index]);
-		if(!in_s.data){
-			printf("Stream closed.\n");
-			flag_exit = 1;
-			//exit(EXIT_FAILURE);
-			return 0;
-		}
+        //        in_s = get_image_from_v4l2(net.w, net.h, net.c, &in_img, dont_close_stream, &frame[buff_index]);
+        if(!in_s.data){
+            printf("Stream closed.\n");
+            flag_exit = 1;
+            //exit(EXIT_FAILURE);
+            return 0;
+        }
 #endif
-	}
+    }
 
 #ifdef CONTENTION_FREE
-	pthread_mutex_unlock(&mutex_lock);
+    pthread_mutex_unlock(&mutex_lock);
 #endif
 
-	image_waiting_time = frame[buff_index].frame_timestamp-fetch_start;
+    image_waiting_time = frame[buff_index].frame_timestamp-fetch_start;
 
-	if (image_waiting_time < .0)
-	{
-		for (int i = 1; i <= QLEN; i++)
-		{
-			image_waiting_time += cycle_array[(cycle_index + i) % QLEN];
-			//printf("cycle time : %f\n", cycle_array[(cycle_index + i) % QLEN]);
+    if(ondemand) transfer_delay = select_time - image_waiting_time;
+    else transfer_delay = .0;
 
-			if ((.0 <= image_waiting_time) && (image_waiting_time <= (1000./30.))) break;
-			else if (image_waiting_time >= (1000./30.)) image_waiting_time = (1000./30.);
+    if (image_waiting_time < .0)
+    {
+        for (int i = 1; i <= QLEN; i++)
+        {
+            image_waiting_time += cycle_array[(cycle_index + i) % QLEN];
+            //printf("cycle time : %f\n", cycle_array[(cycle_index + i) % QLEN]);
 
-			//printf("image waiting time : %f\n", image_waiting_time);
-		}
+            if ((.0 <= image_waiting_time) && (image_waiting_time <= (1000./30.))) break;
+            else if (image_waiting_time >= (1000./30.)) image_waiting_time = (1000./30.);
 
-		if (image_waiting_time <= (0.)) image_waiting_time = 1.;
-	}
+            //printf("image waiting time : %f\n", image_waiting_time);
+        }
 
-	inter_frame_gap = GET_IFG(frame[buff_index].frame_sequence, frame_sequence_tmp);
+        if (image_waiting_time <= (0.)) image_waiting_time = 1.;
+    }
+
+    inter_frame_gap = GET_IFG(frame[buff_index].frame_sequence, frame_sequence_tmp);
 
     //in_s = resize_image(in, net.w, net.h);
 
-	//printf("Image time stamp : %f\n", frame_timestamp[buff_index]);
+    printf("Image time stamp : %f\n", frame[buff_index].frame_timestamp);
 
-	fetch_time = gettimeafterboot() - fetch_start;
+    fetch_time = gettimeafterboot() - fetch_start;
 
-	if(cnt >= start_log){
-		if(ondemand) fetch_array[cnt-start_log] = fetch_time - image_waiting_time;
-		else fetch_array[cnt-start_log] = fetch_time;
+    if(cnt >= start_log){
+        if(ondemand) fetch_array[cnt-start_log] = fetch_time - image_waiting_time;
+        else fetch_array[cnt-start_log] = fetch_time;
 
-		image_waiting_array[cnt-start_log] = image_waiting_time;
-		select_array[cnt-start_log] = select_time;
-		inter_frame_gap_array[cnt-start_log] = inter_frame_gap;
+        image_waiting_array[cnt-start_log] = image_waiting_time;
+        select_array[cnt-start_log] = select_time;
+        inter_frame_gap_array[cnt-start_log] = inter_frame_gap;
+        F_wakeup_delay_array[cnt-start_log] = F_wakeup_delay;
+        transfer_delay_array[cnt-start_log] = transfer_delay;
 
-		//printf("select_time : %f\n", select_time);
-		printf("fetch_time : %f\n", fetch_array[cnt-start_log]);
-		printf("image waiting time : %f\n", image_waiting_time);
-	}
+        //printf("select_time : %f\n", select_time);
+        //printf("fetch_time : %f\n", fetch_array[cnt-start_log]);
+        //printf("image waiting time : %f\n", image_waiting_time);
+    }
 
     return 0;
 }
 
 void *detect_in_thread(void *ptr)
 {
-#ifdef CONTENTION_FREE
-	pthread_mutex_lock(&mutex_lock);
+#ifdef FIFO
+    /* SCHED FIFO */
+
+    struct sched_param param, new_param;
+
+    param.sched_priority = 99;
+
+    if(sched_setscheduler(0, SCHED_FIFO, &param) != 0)
+    {
+        perror("sched_setscheduler failed\n");
+        return ;
+    }
 #endif
 
-   // show_image_cv(det_img, "test");
-	detect_start = gettimeafterboot();
-	
+#ifdef CPU_AFFINITY
+    /* Set CPU 0 */
+    cpu_set_t mask;
+
+    CPU_ZERO(&mask);
+    CPU_SET(0, &mask);
+
+    if (sched_setaffinity(0, sizeof(cpu_set_t), &mask) == -1)
+    {
+        perror("sched_setaffinity");
+//    }
+#endif
+
+
+#ifdef CONTENTION_FREE
+    pthread_mutex_lock(&mutex_lock);
+#endif
+
+    // show_image_cv(det_img, "test");
+    detect_start = gettimeafterboot();
+
+    I_wakeup_delay = detect_start - cycle_end;
+    //printf("Inference wakeup delay : %f\n", I_wakeup_delay);
+
     layer l = net.layers[net.n-1];
 #ifdef V4L2
     float *X = frame[detect_index].resize_frame.data;
@@ -334,29 +416,34 @@ void *detect_in_thread(void *ptr)
     l.output = avg;
 
 #ifndef V4L2
-	cv_images[demo_index] = det_img;
+    cv_images[demo_index] = det_img;
     det_img = cv_images[(demo_index + NFRAMES / 2 + 1) % NFRAMES];
 #endif
     demo_index = (demo_index + 1) % NFRAMES;
 
 #ifdef V4L2
-        dets = get_network_boxes(&net, net.w, net.h, demo_thresh, demo_thresh, 0, 1, &nboxes, 0); // resized
+    dets = get_network_boxes(&net, net.w, net.h, demo_thresh, demo_thresh, 0, 1, &nboxes, 0); // resized
 #else
     if (letter_box)
         dets = get_network_boxes(&net, get_width_mat(in_img), get_height_mat(in_img), demo_thresh, demo_thresh, 0, 1, &nboxes, 1); // letter box
     else
         dets = get_network_boxes(&net, net.w, net.h, demo_thresh, demo_thresh, 0, 1, &nboxes, 0); // resized
 #endif
+    //printf("num_object : %d\n", num_object);
 
 #ifdef CONTENTION_FREE
-	pthread_mutex_unlock(&mutex_lock);
+    pthread_mutex_unlock(&mutex_lock);
 #endif
 
-	detect_time = gettimeafterboot() - detect_start;
+    detect_time = gettimeafterboot() - detect_start;
 
-	if(cnt >= start_log) detect_array[cnt-start_log]=detect_time;
+    if(cnt >= start_log)
+    {
+        detect_array[cnt-start_log] = detect_time;
+        I_wakeup_delay_array[cnt-start_log] = I_wakeup_delay;
+    }
 
-	printf("Detect time : %f\n", detect_time);
+    //printf("Detect time : %f\n", detect_time);
     return 0;
 }
 
@@ -364,61 +451,66 @@ void *detect_in_thread(void *ptr)
 void *display_in_thread(void *ptr)
 {
     int c = show_image_cv(frame[display_index].frame, "Demo");
-	
-	if (c == 27 || c == 1048603) // ESC - exit (OpenCV 2.x / 3.x)
-	{
-		flag_exit = 1;
-	}
 
-	return 0;
+    if (c == 27 || c == 1048603) // ESC - exit (OpenCV 2.x / 3.x)
+    {
+        flag_exit = 1;
+    }
+
+    return 0;
 }
 #endif
 
 #ifdef TRACE
 void *read_data()
 {
-	static int trace_sleep = 0;
-	//FILE *fp_cpu, *fp_gpu;
-	FILE *fp[NUM_TRACE];
+    static int trace_sleep = 0;
+    double read_start, read_time;
+    //FILE *fp_cpu, *fp_gpu;
+    read_start = gettimeafterboot();
+    FILE *fp[NUM_TRACE];
 
-	int cpu_data;
-	int gpu_data;
-	int data[NUM_TRACE] = {0,}; // GPU power, CPU power, GPU temp, CPU temp
-	char path[NUM_TRACE][100] = {GPU_POWER_PATH, CPU_POWER_PATH, GPU_TEMP_PATH, CPU_TEMP_PATH};
+    int cpu_data;
+    int gpu_data;
+    int data[NUM_TRACE] = {0,}; // GPU power, CPU power, GPU temp, CPU temp
+    char path[NUM_TRACE][100] = {GPU_POWER_PATH, CPU_POWER_PATH, GPU_TEMP_PATH, CPU_TEMP_PATH};
 
-	if (!first_trace)
-	{
-		for (int i = 0; i < trace_iter; i++)
-		{
-			usleep(trace_sleep * 1000);
+    if (!first_trace)
+    {
+        for (int i = 0; i < trace_iter; i++)
+        {
+            usleep(trace_sleep * 1000);
 
-			for(int k = 0; k < NUM_TRACE; k++)
-			{
-				fp[k] = fopen(path[k], "r");
+            for(int k = 0; k < NUM_TRACE; k++)
+            {
+                fp[k] = fopen(path[k], "r");
 
-				if(fp[k] == NULL) printf("File open fail\n");
+                if(fp[k] == NULL) printf("File open fail\n");
 
-				fscanf(fp[k], "%d", data + k);
+                fscanf(fp[k], "%d", data + k);
 
-				//		printf("data : %d\n", data[k]);
+                //		printf("data : %d\n", data[k]);
 
-				fclose(fp[k]);
-			}
+                fclose(fp[k]);
+            }
 
-			if (cnt >= start_log){
-				for (int j = 0; j < NUM_TRACE; j++) 
-					trace_array[j][(cnt - start_log) + i] = data[j];
-				//trace_array[j][(count - start_log)] = data[j];
-			}
-		}
-	}
-	else 
-	{
-		trace_sleep = (int)(1000. / fps) / 2.; 
-		printf("trace_sleep : %f\n", trace_sleep);
-		first_trace = 0;
-	}
-	return 0;
+            if (cnt >= start_log){
+                for (int j = 0; j < NUM_TRACE; j++) 
+                    trace_array[j][(cnt - start_log) + i] = data[j];
+                //trace_array[j][(count - start_log)] = data[j];
+            }
+        }
+    }
+    else 
+    {
+        trace_sleep = (int)(1000. / fps) / 2.; 
+        //printf("trace_sleep : %f\n", trace_sleep);
+        first_trace = 0;
+    }
+
+    read_time = gettimeafterboot() - read_start;
+    printf("read time : %f\n", read_time);
+    return 0;
 }
 #endif
 
@@ -432,12 +524,12 @@ double get_wall_time()
 }
 
 void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
-    int frame_skip, char *prefix, char *out_filename, int mjpeg_port, int json_port, int dont_show, int ext_output, int letter_box_in, int time_limit_sec, char *http_post_host,
-    int benchmark, int benchmark_layers, int offset)
+        int frame_skip, char *prefix, char *out_filename, int mjpeg_port, int json_port, int dont_show, int ext_output, int letter_box_in, int time_limit_sec, char *http_post_host,
+        int benchmark, int benchmark_layers, int offset)
 {
     letter_box = letter_box_in;
-	in_img = det_img = show_img = NULL;
-	//skip = frame_skip;
+    in_img = det_img = show_img = NULL;
+    //skip = frame_skip;
     image **alphabet = load_alphabet();
     int delay = frame_skip;
     demo_names = names;
@@ -456,9 +548,9 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     calculate_binary_weights(net);
     srand(2222222);
 
-	//printf("buffer_size : %d\n", opencv_buffer_size);
-	printf("offset : %d\n", offset);
-	fetch_offset = offset;
+    //printf("buffer_size : %d\n", opencv_buffer_size);
+    //printf("offset : %d\n", offset);
+    fetch_offset = offset;
 
     if(filename){
         printf("video file: %s\n", filename);
@@ -466,31 +558,31 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     }else{
         printf("Webcam index: %d\n", cam_index);
 #ifdef V4L2
-		char cam_dev[20] = "/dev/video";
-		char index[2];
-		sprintf(index, "%d", cam_index);
-		strcat(cam_dev, index);
-		printf("cam dev : %s\n", cam_dev);
+        char cam_dev[20] = "/dev/video";
+        char index[2];
+        sprintf(index, "%d", cam_index);
+        strcat(cam_dev, index);
+        printf("cam dev : %s\n", cam_dev);
 
-		int frames = 30;
-		int w = 640;
-		int h = 480;
-		if(open_device(cam_dev, frames, w, h) < 0)
-		{
-			error("Couldn't connect to webcam.\n");
+        int frames = 30;
+        int w = 640;
+        int h = 480;
+        if(open_device(cam_dev, frames, w, h) < 0)
+        {
+            error("Couldn't connect to webcam.\n");
 
-		}
+        }
 #else
         cap = get_capture_webcam(cam_index);
 
-		if (!cap) {
+        if (!cap) {
 #ifdef WIN32
-			printf("Check that you have copied file opencv_ffmpeg340_64.dll to the same directory where is darknet.exe \n");
+            printf("Check that you have copied file opencv_ffmpeg340_64.dll to the same directory where is darknet.exe \n");
 #endif
-			error("Couldn't connect to webcam.\n");
-		}
+            error("Couldn't connect to webcam.\n");
+        }
 #endif
-	}
+    }
 
     layer l = net.layers[net.n-1];
     int j;
@@ -508,35 +600,33 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
     pthread_t fetch_thread;
     pthread_t detect_thread;
-#ifdef TRACE
     pthread_t trace_thread;
-#endif
 
-	ondemand = check_on_demand();
-	printf("ondemand : %d\n", ondemand);
+    ondemand = check_on_demand();
+    //printf("ondemand : %d\n", ondemand);
 
 #ifdef V4L2
-	frame[0].frame = capture_image(&frame[buff_index]);
-	frame[0].resize_frame = letterbox_image(frame[0].frame, net.w, net.h);
+    frame[0].frame = capture_image(&frame[buff_index]);
+    frame[0].resize_frame = letterbox_image(frame[0].frame, net.w, net.h);
 
-	frame[1].frame = frame[0].frame;
-	frame[1].resize_frame = letterbox_image(frame[0].frame, net.w, net.h);
+    frame[1].frame = frame[0].frame;
+    frame[1].resize_frame = letterbox_image(frame[0].frame, net.w, net.h);
 
-	frame[2].frame = frame[0].frame;
-	frame[2].resize_frame = letterbox_image(frame[0].frame, net.w, net.h);
+    frame[2].frame = frame[0].frame;
+    frame[2].resize_frame = letterbox_image(frame[0].frame, net.w, net.h);
 
 #else
     fetch_in_thread(0);
     det_img = in_img;
-	det_s = in_s;
+    det_s = in_s;
 
-	fetch_in_thread(0);
+    fetch_in_thread(0);
     detect_in_thread(0);
     det_img = in_img;
-	det_s = in_s;
+    det_s = in_s;
 
     for (j = 0; j < NFRAMES / 2; ++j) {
-		free_detections(dets, nboxes);
+        free_detections(dets, nboxes);
         fetch_in_thread(0);
         detect_in_thread(0);
         det_img = in_img;
@@ -548,7 +638,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     if(!prefix && !dont_show){
         int full_screen = 0;
         create_window_cv("Demo", full_screen, 1352, 1013);
-		//make_window("Demo", 1352, 1013, full_screen);
+        //make_window("Demo", 1352, 1013, full_screen);
     }
 
     write_cv* output_video_writer = NULL;
@@ -578,404 +668,444 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     float avg_fps = 0;
     int frame_counter = 0;
 
-	double image_waiting_sum[cycle]={0};
-	double fetch_sum[cycle]={0};
-	double detect_sum[cycle]={0};
-	double display_sum[cycle]={0};
-	double slack_sum[cycle]={0};
-	double fps_sum[cycle]={0};
-	double latency_sum[cycle]={0};
-	double select_sum[cycle]={0};
-	double trace_data_sum[NUM_TRACE]={0};
-	int inter_frame_gap_sum[cycle]={0};
-	double cycle_time_sum[cycle]={0};
-	double fps_buff[3];
+    //	double image_waiting_sum[cycle]={0};
+    //	double fetch_sum[cycle]={0};
+    //	double detect_sum[cycle]={0};
+    //	double display_sum[cycle]={0};
+    //	double slack_sum[cycle]={0};
+    //	double fps_sum[cycle]={0};
+    //	double latency_sum[cycle]={0};
+    //	double select_sum[cycle]={0};
+    //	double trace_data_sum[NUM_TRACE]={0};
+    //	int inter_frame_gap_sum[cycle]={0};
+    //	double cycle_time_sum[cycle]={0};
+    //	double fps_buff[3];
+    //	int num_object_sum[cycle]={0};
+    //	double F_wakeup_sum[cycle]={0};
+    //	double I_wakeup_sum[cycle]={0};
+    //	double D_wakeup_sum[cycle]={0};
+
+    double image_waiting_sum={0};
+    double fetch_sum={0};
+    double detect_sum={0};
+    double display_sum={0};
+    double slack_sum={0};
+    double fps_sum={0};
+    double latency_sum={0};
+    double select_sum={0};
+    double trace_data_sum[NUM_TRACE]={0};
+    int inter_frame_gap_sum={0};
+    double cycle_time_sum={0};
+    double fps_buff[3];
+    int num_object_sum={0};
+    double F_wakeup_sum={0};
+    double I_wakeup_sum={0};
+    double D_wakeup_sum={0};
+    double transfer_delay_sum={0};
+    double draw_bbox_sum={0};
 
 #ifdef CONTENTION_FREE
-	pthread_mutex_init(&mutex_lock, NULL);
+    pthread_mutex_init(&mutex_lock, NULL);
 #endif
 
-	for(int iter=0;iter<cycle;iter++){
-		while(1){
-			printf("================start================\n");
-			++count;
-			{
-				/* Image index */
+    while(1){
+        printf("================start================\n");
+        ++count;
+        {
+            /* Image index */
 #if (defined PARALLEL)
-				display_index = (buff_index + 1) %3;
-				detect_index = (buff_index + 2) %3;
+            display_index = (buff_index + 1) %3;
+            detect_index = (buff_index + 2) %3;
 #elif (defined SEQUENTIAL)
-				display_index = (buff_index) %3;
-				detect_index = (buff_index) %3;
+            display_index = (buff_index) %3;
+            detect_index = (buff_index) %3;
 #elif (defined CONTENTION_FREE)
-				display_index = (buff_index + 2) %3;
-				detect_index = (buff_index + 2) %3;
+            display_index = (buff_index + 2) %3;
+            detect_index = (buff_index + 2) %3;
 #endif
-				const float nms = .45;    // 0.4F
-				int local_nboxes = nboxes;
-				detection *local_dets = dets;
+            const float nms = .45;    // 0.4F
+            int local_nboxes = nboxes;
+            detection *local_dets = dets;
 
 #ifndef SEQUENTIAL
-				/* Parallel or Contention free */
-				if (!benchmark) if (pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
+            /* Parallel or Contention free */
+            if (!benchmark) if (pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
 #endif
 
 #ifdef TRACE
-				/* Trace CPU, GPU thermal, power */
-				if(pthread_create(&trace_thread, 0, read_data, 0)) error("Thread creation failed");
+            /* Trace CPU, GPU thermal, power */
+            if(pthread_create(&trace_thread, 0, read_data, 0)) error("Thread creation failed");
 #endif
 
 #ifdef PARALLEL 
-				/* Sequential or Contention free */
-				if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
-				//if (nms) do_nms_obj(local_dets, local_nboxes, l.classes, nms);    // bad results
-				if (nms) {
-					if (l.nms_kind == DEFAULT_NMS) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
-					else diounms_sort(local_dets, local_nboxes, l.classes, nms, l.nms_kind, l.beta_nms);
-				}
+            /* Sequential or Contention free */
+            if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
+            //if (nms) do_nms_obj(local_dets, local_nboxes, l.classes, nms);    // bad results
+            if (nms) {
+                if (l.nms_kind == DEFAULT_NMS) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
+                else diounms_sort(local_dets, local_nboxes, l.classes, nms, l.nms_kind, l.beta_nms);
+            }
 #endif
 
 #ifdef SEQUENTIAL
-				/* Sequential */
-				fetch_in_thread(0);
+            /* Sequential */
+            fetch_in_thread(0);
 
-				det_img = in_img;
-				det_s = in_s;
+            det_img = in_img;
+            det_s = in_s;
 #endif
 
 #if (defined SEQUENTIAL || defined CONTENTION_FREE)
-				/* Sequential or Contention free*/
-				detect_in_thread(0);
+            /* Sequential or Contention free*/
+            detect_in_thread(0);
 
-				if (nms) {
-					if (l.nms_kind == DEFAULT_NMS) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
-					else diounms_sort(local_dets, local_nboxes, l.classes, nms, l.nms_kind, l.beta_nms);
-				}
-				show_img = det_img;
+            if (nms) {
+                if (l.nms_kind == DEFAULT_NMS) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
+                else diounms_sort(local_dets, local_nboxes, l.classes, nms, l.nms_kind, l.beta_nms);
+            }
+            show_img = det_img;
 #endif
 
-				/* display thread */
+            /* display thread */
 
-				double display_start = gettimeafterboot();
+            cpu_set_t mask;
+
+            CPU_ZERO(&mask);
+            CPU_SET(2, &mask);
+
+            if (sched_setaffinity(0, sizeof(cpu_set_t), &mask) == -1)
+            {
+                perror("sched_setaffinity");
+            }
+
+#ifdef FIFO
+            /* SCHED FIFO */
+
+            struct sched_param param, new_param;
+
+            param.sched_priority = 99;
+
+            if(sched_setscheduler(0, SCHED_FIFO, &param) != 0)
+            {
+                perror("sched_setscheduler failed\n");
+                return ;
+            }
+            //printf("Display policy = %d\n", sched_getscheduler(0));
+#endif
+
+#ifdef CPU_AFFINITY
+            /* Set CPU 2 */
+            cpu_set_t mask;
+
+            CPU_ZERO(&mask);
+            CPU_SET(2, &mask);
+
+            if (sched_setaffinity(0, sizeof(cpu_set_t), &mask) == -1)
+            {
+                perror("sched_setaffinity");
+            }
+#endif
+
+            double display_start = gettimeafterboot();
+
+            D_wakeup_delay = display_start - cycle_end;
+            //printf("Display wakeup delay : %f\n", D_wakeup_delay);
+
 #ifdef V4L2
-				//if (!benchmark) draw_detections_v3(display, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
-				if (!benchmark) draw_detections_v3(frame[display_index].frame, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
-				free_detections(local_dets, local_nboxes);
+            //if (!benchmark) draw_detections_v3(display, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
 
-				/* Image display */
-				display_in_thread(0);
+            if (!benchmark) draw_detections_v3(frame[display_index].frame, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
+            free_detections(local_dets, local_nboxes);
+
+            draw_bbox_time = gettimeafterboot() - display_start;
+            printf("Draw bbox time : %f\n", draw_bbox_time);
+
+            /* Image display */
+            display_in_thread(0);
 #else
-				/* original display thread */
+            /* original display thread */
 
-				//printf("\033[2J");
-				//printf("\033[1;1H");
-				//printf("\nFPS:%.1f\n", fps);
-				printf("Objects:\n\n");
+            //printf("\033[2J");
+            //printf("\033[1;1H");
+            //printf("\nFPS:%.1f\n", fps);
+            printf("Objects:\n\n");
 
-				++frame_id;
-				if (demo_json_port > 0) {
-					int timeout = 400000;
-					send_json(local_dets, local_nboxes, l.classes, demo_names, frame_id, demo_json_port, timeout);
-				}
+            ++frame_id;
+            if (demo_json_port > 0) {
+                int timeout = 400000;
+                send_json(local_dets, local_nboxes, l.classes, demo_names, frame_id, demo_json_port, timeout);
+            }
 
-				//char *http_post_server = "webhook.site/898bbd9b-0ddd-49cf-b81d-1f56be98d870";
-				if (http_post_host && !send_http_post_once) {
-					int timeout = 3;            // 3 seconds
-					int http_post_port = 80;    // 443 https, 80 http
-					if (send_http_post_request(http_post_host, http_post_port, filename,
-								local_dets, nboxes, classes, names, frame_id, ext_output, timeout))
-					{
-						if (time_limit_sec > 0) send_http_post_once = 1;
-					}
-				}
+            //char *http_post_server = "webhook.site/898bbd9b-0ddd-49cf-b81d-1f56be98d870";
+            if (http_post_host && !send_http_post_once) {
+                int timeout = 3;            // 3 seconds
+                int http_post_port = 80;    // 443 https, 80 http
+                if (send_http_post_request(http_post_host, http_post_port, filename,
+                            local_dets, nboxes, classes, names, frame_id, ext_output, timeout))
+                {
+                    if (time_limit_sec > 0) send_http_post_once = 1;
+                }
+            }
 
-				if (!benchmark) draw_detections_cv_v3(show_img, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
-				free_detections(local_dets, local_nboxes);
+            if (!benchmark) draw_detections_cv_v3(show_img, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
+            free_detections(local_dets, local_nboxes);
 
-				printf("\nFPS:%.1f \t AVG_FPS:%.1f\n", fps, avg_fps);
+            printf("\nFPS:%.1f \t AVG_FPS:%.1f\n", fps, avg_fps);
 
-				if(!prefix){
-					if (!dont_show) {
-						show_image_mat(show_img, "Demo");
-						int c = wait_key_cv(1);
-						if (c == 10) {
-							if (frame_skip == 0) frame_skip = 60;
-							else if (frame_skip == 4) frame_skip = 0;
-							else if (frame_skip == 60) frame_skip = 4;
-							else frame_skip = 0;
-						}
-						else if (c == 27 || c == 1048603) // ESC - exit (OpenCV 2.x / 3.x)
-						{
-							flag_exit = 1;
-						}
-					}
-				}else{
-					char buff[256];
-					sprintf(buff, "%s_%08d.jpg", prefix, count);
-					if(show_img) save_cv_jpg(show_img, buff);
-				}
+            if(!prefix){
+                if (!dont_show) {
+                    show_image_mat(show_img, "Demo");
+                    int c = wait_key_cv(1);
+                    if (c == 10) {
+                        if (frame_skip == 0) frame_skip = 60;
+                        else if (frame_skip == 4) frame_skip = 0;
+                        else if (frame_skip == 60) frame_skip = 4;
+                        else frame_skip = 0;
+                    }
+                    else if (c == 27 || c == 1048603) // ESC - exit (OpenCV 2.x / 3.x)
+                    {
+                        flag_exit = 1;
+                    }
+                }
+            }else{
+                char buff[256];
+                sprintf(buff, "%s_%08d.jpg", prefix, count);
+                if(show_img) save_cv_jpg(show_img, buff);
+            }
 
-				// if you run it with param -mjpeg_port 8090  then open URL in your web-browser: http://localhost:8090
-				if (mjpeg_port > 0 && show_img) {
-					int port = mjpeg_port;
-					int timeout = 400000;
-					int jpeg_quality = 40;    // 1 - 100
-					send_mjpeg(show_img, port, timeout, jpeg_quality);
-				}
+            // if you run it with param -mjpeg_port 8090  then open URL in your web-browser: http://localhost:8090
+            if (mjpeg_port > 0 && show_img) {
+                int port = mjpeg_port;
+                int timeout = 400000;
+                int jpeg_quality = 40;    // 1 - 100
+                send_mjpeg(show_img, port, timeout, jpeg_quality);
+            }
 
-				// save video file
-				if (output_video_writer && show_img) {
-					write_frame_cv(output_video_writer, show_img);
-					printf("\n cvWriteFrame \n");
-				}
+            // save video file
+            if (output_video_writer && show_img) {
+                write_frame_cv(output_video_writer, show_img);
+                printf("\n cvWriteFrame \n");
+            }
 #endif
-				/* display end */
+            /* display end */
 
-				display_end = gettimeafterboot();
+            display_end = gettimeafterboot();
 
-				display_time = display_end - display_start; 
+            display_time = display_end - display_start; 
 
-				printf("display : %f\n", display_time);
+            printf("display : %f\n", display_time);
 
 #ifndef CONTENTION_FREE
-				/* Prallel or Sequential */
-				pthread_join(detect_thread, 0);
+            /* Prallel or Sequential */
+            pthread_join(detect_thread, 0);
 #endif
 
 #ifdef TRACE
-				/* TRACE end */
-				pthread_join(trace_thread, 0);
+            /* TRACE end */
+            pthread_join(trace_thread, 0);
 #endif
 
 #ifndef SEQUENTIAL
-				/* Parallel or Contention free */
-				if (!benchmark) {
-					pthread_join(fetch_thread, 0);
-					free_image(det_s);
-				}
+            /* Parallel or Contention free */
+            if (!benchmark) {
+                pthread_join(fetch_thread, 0);
+                free_image(det_s);
+            }
 #endif
-				if (time_limit_sec > 0 && (get_time_point() - start_time_lim)/1000000 > time_limit_sec) {
-					printf(" start_time_lim = %f, get_time_point() = %f, time spent = %f \n", start_time_lim, get_time_point(), get_time_point() - start_time_lim);
-					break;
-				}
+            if (time_limit_sec > 0 && (get_time_point() - start_time_lim)/1000000 > time_limit_sec) {
+                printf(" start_time_lim = %f, get_time_point() = %f, time spent = %f \n", start_time_lim, get_time_point(), get_time_point() - start_time_lim);
+                break;
+            }
 
-				if (flag_exit == 1) break;
+            if (flag_exit == 1) break;
 
-				if(delay == 0){
+            if(delay == 0){
 
 #ifndef V4L2
-					if(!benchmark) release_mat(&show_img);
+                if(!benchmark) release_mat(&show_img);
 #endif
 
 #ifndef CONTENTION_FREE
-					/* Parallel or Sequential */
-					show_img = det_img;
+                /* Parallel or Sequential */
+                show_img = det_img;
 #endif
-				}
-				det_img = in_img;
-				det_s = in_s;
+            }
+            det_img = in_img;
+            det_s = in_s;
 
-			}
-			--delay;
-			if(delay < 0){
-				delay = frame_skip;
+            cycle_end = gettimeafterboot();
+        }
+        --delay;
+        if(delay < 0){
+            delay = frame_skip;
 
-				//double after = get_wall_time();
-				//float curr = 1./(after - before);
-				double after = get_time_point();    // more accurate time measurements
-				double after_1 = gettimeafterboot();    
-				float curr = 1000000. / (after - before);
-				float curr_1 = (after_1 - before_1);
-				printf("FPS : %f\n",1000.0/curr_1);
-				//fps = fps*0.9 + curr*0.1;  
-				fps = 1000.0/curr_1;
-				before = after;
-				before_1 = after_1;
+            //double after = get_wall_time();
+            //float curr = 1./(after - before);
+            double after = get_time_point();    // more accurate time measurements
+            double after_1 = gettimeafterboot();    
+            float curr = 1000000. / (after - before);
+            float curr_1 = (after_1 - before_1);
+            printf("FPS : %f\n",1000.0/curr_1);
+            //fps = fps*0.9 + curr*0.1;  
+            fps = 1000.0/curr_1;
+            before = after;
+            before_1 = after_1;
 
-				fps_buff[display_index] = fps;
-				//for(int k = 0; k < 3; k++) printf("fps_buff[%d] : %f\n", k, fps_buff[k]);
+            fps_buff[display_index] = fps;
+            //for(int k = 0; k < 3; k++) printf("fps_buff[%d] : %f\n", k, fps_buff[k]);
 
 #if (defined PARALLEL)
-				fps = GET_FPS(fps_buff[buff_index], fps_buff[detect_index], fps_buff[display_index]);
+            fps = GET_FPS(fps_buff[buff_index], fps_buff[detect_index], fps_buff[display_index]);
 #elif (defined OPTIMAL || defined I-ALONE || defined F-ALONE || defined D-ALONE)
-				fps = GET_FPS(fps_buff[buff_index], fps_buff[display_index]);
+            fps = GET_FPS(fps_buff[buff_index], fps_buff[display_index]);
 #elif (defined SEQUENTIAL)
-				fps = fps_buff[display_index];
+            fps = fps_buff[display_index];
 #endif
 
-				float spent_time = (get_time_point() - start_time) / 1000000;
-				frame_counter++;
-				if (spent_time >= 3.0f) {
-					//printf(" spent_time = %f \n", spent_time);
-					avg_fps = frame_counter / spent_time;
-					frame_counter = 0;
-					start_time = get_time_point();
-				}
-			}
+            float spent_time = (get_time_point() - start_time) / 1000000;
+            frame_counter++;
+            if (spent_time >= 3.0f) {
+                //printf(" spent_time = %f \n", spent_time);
+                avg_fps = frame_counter / spent_time;
+                frame_counter = 0;
+                start_time = get_time_point();
+            }
+        }
 
-			cycle_array[cycle_index] = 1000./fps;
+        cycle_array[cycle_index] = 1000./fps;
 
-			cycle_index = (cycle_index + 1) % 4;
+        cycle_index = (cycle_index + 1) % 4;
 
 #if (defined PARALLEL || defined ZERO_SLACK)
-				slack_time = (MAX(detect_time, display_time))-(fetch_offset+fetch_time);
+        slack_time = (MAX(detect_time, display_time))-(fetch_offset+fetch_time);
 #elif (defined CONTENTION_FREE)
-				slack_time = (display_time)-(fetch_time);
+        slack_time = (display_time)-(fetch_time);
 #elif (defined SEQUENTIAL)
-				slack_time = .0;
+        slack_time = .0;
 #endif
 
 #ifdef ZERO_SLACK
 
-				if(((-10.0) > slack_time) || (10.0 < slack_time)) fetch_offset += slack_time;
+        //if(((-10.0) > slack_time) || (10.0 < slack_time)) fetch_offset += slack_time;
 #endif
 
-				printf("slack: %f\n",slack_time);
+        //printf("slack: %f\n",slack_time);
 
-				if(cnt>=start_log){
-					fps_array[cnt-start_log] = fps;
-					cycle_time_array[cnt-start_log] = 1000./fps;
-					latency[cnt-start_log]=display_end-frame[display_index].frame_timestamp;
-					display_array[cnt-start_log]=display_time;
-					slack[cnt - start_log] = slack_time;
+        if(cnt>=start_log){
+            fps_array[cnt-start_log] = fps;
+            cycle_time_array[cnt-start_log] = 1000./fps;
+            latency[cnt-start_log]=display_end-frame[display_index].frame_timestamp;
+            display_array[cnt-start_log]=display_time;
+            slack[cnt - start_log] = slack_time;
+            num_object_array[cnt - start_log] = num_object;
+            D_wakeup_delay_array[cnt - start_log] = D_wakeup_delay;
+            draw_bbox_array[cnt - start_log] = draw_bbox_time;
 
-					printf("slack: %f\n",slack[cnt-start_log]);
-					printf("latency: %f\n",latency[cnt-start_log]);
-					printf("cnt : %d\n",cnt);
-				}
+            //printf("slack: %f\n",slack[cnt-start_log]);
+            //printf("latency: %f\n",latency[cnt-start_log]);
+            printf("cnt : %d\n",cnt);
+        }
 
-				if(cnt==((iteration+start_log)-1)){
-					int exist=0;
-					FILE *fp;
-				char file_path[100] = "";
+        if(cnt==((iteration+start_log)-1)){
+            int exist=0;
+            FILE *fp;
+            char file_path[100] = "";
 
-				strcat(file_path, MEASUREMENT_PATH);
-				strcat(file_path, MEASUREMENT_FILE);
+            strcat(file_path, MEASUREMENT_PATH);
+            strcat(file_path, MEASUREMENT_FILE);
+#ifdef ZERO_SLACK
+            char string[100];
+            sprintf(string, "%d", fetch_offset);
+            strcat(string, ".csv"); 
+            strcat(file_path, string); 
+#endif
 
-				fp=fopen(file_path,"w+");
+            fp=fopen(file_path,"w+");
 
-				if (fp == NULL) 
-				{
-					/* make directory */
-					while(!exist){
-						int result;
+            if (fp == NULL) 
+            {
+                /* make directory */
+                while(!exist){
+                    int result;
 
-						result = mkdir(MEASUREMENT_PATH, 0766);
+                    result = mkdir(MEASUREMENT_PATH, 0766);
 
-						if(result == 0) { 
-							exist = 1;
+                    if(result == 0) { 
+                        exist = 1;
 
-							fp=fopen(file_path,"w+");
-						}
-					}
-				}
+                        fp=fopen(file_path,"w+");
+                    }
+                }
+            }
+            fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n","b_w", "e_f", "e_i", "e_d", "slack", "fps", "latency", "select",
+                    "ifg", "cycle_time", "num_object", "transfer_delay", "draw_box", 
+                    "GPU_Power", "CPU_Power", "GPU_temp", "CPU_temp");
 
-				fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n","b_w", "e_f", "e_i","e_d", "slack", "fps", "latency", "select", "ifg", "cycle_time");
+            for(int i=0;i<iteration;i++){
+                image_waiting_sum += image_waiting_array[i];
+                fetch_sum += fetch_array[i];
+                detect_sum += detect_array[i];
+                display_sum += display_array[i];
+                slack_sum += slack[i];
+                fps_sum += fps_array[i];
+                latency_sum += latency[i];
+                select_sum += select_array[i];
+                inter_frame_gap_sum += inter_frame_gap_array[i];
+                cycle_time_sum += cycle_time_array[i];
+                num_object_sum += num_object_array[i];
+//                F_wakeup_sum += F_wakeup_delay_array[i];
+//                I_wakeup_sum += I_wakeup_delay_array[i];
+//                D_wakeup_sum += D_wakeup_delay_array[i];
+                transfer_delay_sum += transfer_delay_array[i];
+                draw_bbox_sum += draw_bbox_array[i];
 
-				for(int i=0;i<iteration;i++){
-					image_waiting_sum[iter]+=image_waiting_array[i];
-					fetch_sum[iter]+=fetch_array[i];
-					detect_sum[iter]+=detect_array[i];
-					display_sum[iter]+=display_array[i];
-					slack_sum[iter]+=slack[i];
-					fps_sum[iter]+=fps_array[i];
-					latency_sum[iter]+=latency[i];
-					select_sum[iter]+=select_array[i];
-					inter_frame_gap_sum[iter]+=inter_frame_gap_array[i];
-					cycle_time_sum[iter]+=cycle_time_array[cnt-start_log];
+                for (int j = 0; j < NUM_TRACE; j++)
+                    trace_data_sum[j] += trace_array[j][i];
 
-					fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%d,%f\n",image_waiting_array[i],fetch_array[i],detect_array[i],	display_array[i],slack[i],fps_array[i],latency[i], select_array[i], inter_frame_gap_array[i], cycle_time_array[i]);
-				}
-				fclose(fp);
+                fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%d,%f,%f,%f,%f,%f,%f\n",image_waiting_array[i],fetch_array[i],detect_array[i],display_array[i], 
+                        slack[i], fps_array[i], latency[i], select_array[i], inter_frame_gap_array[i], cycle_time_array[i], num_object_array[i],
+                        transfer_delay_array[i], draw_bbox_array[i],
+                        trace_array[0][i], trace_array[1][i], trace_array[2][i], trace_array[3][i]);
+            }
+            fclose(fp);
+
+            /* exit loop */
+            break;
+        }
+        cnt++;
+        buff_index = (buff_index + 1) % 3;
+        printf("================end===============\n");
+    }
+    cnt = 0;
+
+    /* Average data */
+    printf("============ Darknet data ===========\n");
+    printf("Avg image waiting (ms): %f\n", image_waiting_sum / iteration);
+    printf("Avg fetch (ms) : %f\n", fetch_sum / iteration);
+    printf("Avg detect (ms) : %f\n", detect_sum / iteration);
+    printf("Avg display (ms) : %f\n", display_sum / iteration);
+    printf("Avg slack (ms) : %f\n", slack_sum / iteration);
+    printf("Avg fps : %f\n", fps_sum / iteration);
+    printf("Avg latency (ms) : %f\n", latency_sum / iteration);
+    printf("Avg select (ms) : %f\n", select_sum / iteration);
+    printf("Avg inter frame gap : %f\n", (double)inter_frame_gap_sum / iteration);
+    printf("Avg cycle time (ms) : %f\n", cycle_time_sum / iteration);
+    printf("Avg num object : %f\n", (double)num_object_sum / iteration);
+    printf("Avg Image transfer delay (ms) : %f\n", transfer_delay_sum / iteration);
+    printf("Avg draw bbox time (ms) : %f\n", draw_bbox_sum / iteration);
+//    printf("Avg fetch wakeup delay (ms) : %f\n", F_wakeup_sum / iteration);
+//    printf("Avg inference wakeup delay (ms) : %f\n", I_wakeup_sum / iteration);
+//    printf("Avg display wakeup delay (ms) : %f\n", D_wakeup_sum / iteration);
+
 #ifdef TRACE
-				FILE *t_fp;
-				char t_file_path[100] = "";
-				int t_exist = 0;
-
-				strcat(t_file_path, TRACE_PATH);
-				strcat(t_file_path, TRACE_FILE);
-
-				printf("trace path : %s\n", t_file_path);
-				t_fp=fopen(t_file_path,"w+");
-
-				if (t_fp == NULL) 
-				{
-					/* make directory */
-					while(!t_exist){
-						int t_result;
-
-						t_result = mkdir(TRACE_PATH, 0766);
-
-						if(t_result == 0) {
-							/* success */
-							t_exist = 1;
-
-							t_fp=fopen(t_file_path,"w+");
-						}
-					}
-				}
-
-				for(int i = 0; i < trace_iter * iteration; i++) 
-				{
-					for(int k = 0; k < NUM_TRACE; k++) 
-					{
-						printf("%0.1f\n", trace_array[k][i]);
-						switch(k){
-							case 0:
-								fprintf(t_fp, "%0.1f,", trace_array[k][i]);
-								break;
-							case 1:
-								fprintf(t_fp, "%0.1f,", trace_array[k][i]);
-								break;
-							case 2:
-								trace_array[k][i] /= 1000.0;
-								fprintf(t_fp, "%0.1f,", trace_array[k][i]);
-								break;
-							case 3:
-								trace_array[k][i] /= 1000.0;
-								fprintf(t_fp, "%0.1f\n", trace_array[k][i]);
-								break;
-							default:
-								break;
-						}
-						trace_data_sum[k] += trace_array[k][i];
-					}
-				}
-				fclose(t_fp);
+    printf("======== Power & Temperature ========\n");
+    printf("Avg_gpu_power : %f\n", trace_data_sum[0] / iteration);
+    printf("Avg_cpu_power : %f\n", trace_data_sum[1] / iteration);
+    printf("Avg_gpu_temp : %f\n", trace_data_sum[2] / iteration);
+    printf("Avg_cpu_temp : %f\n", trace_data_sum[3] / iteration);
 #endif
+    printf("=====================================\n");
 
-				/* exit loop */
-				break;
-			}
-			cnt++;
-			buff_index = (buff_index + 1) % 3;
-			printf("================end===============\n");
-		}
-		cnt = 0;
-	}
-	
-	//print average data
-	for(int k=0; k<cycle;k++){
-		printf("======== Darknet data ========\n");
-		printf("avg_image_waiting[%d] : %f\n",k,image_waiting_sum[k]/iteration);
-		printf("avg_fetch[%d] : %f\n",k,fetch_sum[k]/iteration);
-		printf("avg_detect[%d] : %f\n",k,detect_sum[k]/iteration);
-		printf("avg_display[%d] : %f\n",k,display_sum[k]/iteration);
-		printf("avg_slack[%d] : %f\n",k,slack_sum[k]/iteration);
-		printf("avg_fps[%d] : %f\n",k,fps_sum[k]/iteration);
-		printf("avg_latency[%d] : %f\n",k,latency_sum[k]/iteration);
-		printf("avg_select[%d] : %f\n",k,select_sum[k]/iteration);
-		printf("avg_inter_frame_gap[%d] : %f\n",k,(double)inter_frame_gap_sum[k]/iteration);
-		printf("avg_cycle_time[%d] : %f\n",k,cycle_time_sum[k]/iteration);
-#ifdef TRACE
-		printf("======== Power & Temperature ========\n");
-		printf("avg_gpu_power : %f\n", trace_data_sum[0]/(4*iteration));
-		printf("avg_cpu_power : %f\n", trace_data_sum[1]/(4*iteration));
-		printf("avg_gpu_temp : %f\n", trace_data_sum[2]/(4*iteration));
-		printf("avg_cpu_temp : %f\n", trace_data_sum[3]/(4*iteration));
-#endif
-
-	}
 
     printf("input video stream closed. \n");
     if (output_video_writer) {
@@ -984,25 +1114,25 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     }
 
     // free memory
-	//printf("1\n");
+    //printf("1\n");
     free_image(in_s);
-	//printf("2\n");
+    //printf("2\n");
     free_detections(dets, nboxes);
-	//printf("3\n");
+    //printf("3\n");
 
     free(avg);
-	//printf("3.1\n");
+    //printf("3.1\n");
     for (j = 0; j < NFRAMES; ++j) free(predictions[j]);
     demo_index = (NFRAMES + demo_index - 1) % NFRAMES;
-	//printf("3.2\n");
+    //printf("3.2\n");
     for (j = 0; j < NFRAMES; ++j) {
-            release_mat(&cv_images[j]);
-			printf("j = %d\n", j);
-			printf("NAFRAMES = %d\n", NFRAMES);
+        release_mat(&cv_images[j]);
+        printf("j = %d\n", j);
+        printf("NAFRAMES = %d\n", NFRAMES);
     }
-	printf("4\n");
+    printf("4\n");
     free_ptrs((void **)names, net.layers[net.n - 1].classes);
-	printf("5\n");
+    printf("5\n");
     int i;
     const int nsize = 8;
     for (j = 0; j < nsize; ++j) {
@@ -1017,8 +1147,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 }
 #else
 void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
-    int frame_skip, char *prefix, char *out_filename, int mjpeg_port, int json_port, int dont_show, int ext_output, int letter_box_in, int time_limit_sec, char *http_post_host,
-    int benchmark, int benchmark_layers)
+        int frame_skip, char *prefix, char *out_filename, int mjpeg_port, int json_port, int dont_show, int ext_output, int letter_box_in, int time_limit_sec, char *http_post_host,
+        int benchmark, int benchmark_layers)
 {
     fprintf(stderr, "Demo needs OpenCV for webcam images.\n");
 }
