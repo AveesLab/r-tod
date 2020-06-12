@@ -20,6 +20,9 @@
 #include "stb_image_write.h"
 #endif
 
+//#define DUMMY_OBJECT
+#define NUM_DUMMY 0
+
 extern int check_mistakes;
 //int windows = 0;
 
@@ -311,6 +314,7 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
 {
     static int frame_id = 0;
     frame_id++;
+	extern int num_object;
 
     int selected_detections_num;
     detection_with_class* selected_detections = get_actual_detections(dets, num, thresh, &selected_detections_num, names);
@@ -318,7 +322,8 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
     // text output
     qsort(selected_detections, selected_detections_num, sizeof(*selected_detections), compare_by_lefts);
     int i;
-    for (i = 0; i < selected_detections_num; ++i) {
+	num_object = selected_detections_num;
+	for (i = 0; i < selected_detections_num; ++i) {
         const int best_class = selected_detections[i].best_class;
         printf("%s: %.0f%%", names[best_class],    selected_detections[i].det.prob[best_class] * 100);
         if (ext_output)
@@ -344,19 +349,30 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
         }
     }
 
+
+
     // image output
     qsort(selected_detections, selected_detections_num, sizeof(*selected_detections), compare_by_probs);
-    for (i = 0; i < selected_detections_num; ++i) {
+
+#ifdef DUMMY_OBJECT
+    /* dummy object */
+
+    int loop_cnt;
+
+    for (loop_cnt = 0; loop_cnt < NUM_DUMMY; loop_cnt++)
+    {
+#endif
+        for (i = 0; i < selected_detections_num; ++i) {
             int width = im.h * .006;
             if (width < 1)
                 width = 1;
 
             /*
-            if(0){
-            width = pow(prob, 1./2.)*10+1;
-            alphabet = 0;
-            }
-            */
+               if(0){
+               width = pow(prob, 1./2.)*10+1;
+               alphabet = 0;
+               }
+             */
 
             //printf("%d %s: %.0f%%\n", i, names[selected_detections[i].best_class], prob*100);
             int offset = selected_detections[i].best_class * 123457 % classes;
@@ -372,8 +388,13 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
             rgb[2] = blue;
             box b = selected_detections[i].det.bbox;
 
+#if (defined DUMMY_OBJECT)
+            int left = (b.x - b.w / 2.)*im.w + (loop_cnt * 5);
+            int right = (b.x + b.w / 2.)*im.w + (loop_cnt * 5);
+#else
             int left = (b.x - b.w / 2.)*im.w;
             int right = (b.x + b.w / 2.)*im.w;
+#endif
             int top = (b.y - b.h / 2.)*im.h;
             int bot = (b.y + b.h / 2.)*im.h;
 
@@ -410,7 +431,7 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
             }
             else {
                 draw_box_width(im, left, top, right, bot, width, red, green, blue); // 3 channels RGB
-//				printf("%d, %d, %d, %d \n", left, top,right,bot);
+                //				printf("%d, %d, %d, %d \n", left, top,right,bot);
             }
             if (alphabet) {
                 char labelstr[4096] = { 0 };
@@ -435,7 +456,10 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
                 free_image(resized_mask);
                 free_image(tmask);
             }
+        }
+#ifdef DUMMY_OBJECT
     }
+#endif
     free(selected_detections);
 }
 
