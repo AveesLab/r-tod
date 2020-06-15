@@ -27,6 +27,8 @@
 //#define BUSY_WAITING
 
 //#define DEBUG
+#define BGR24
+//#define MJPEG 
 
 int fd;
 fd_set fds;
@@ -96,6 +98,14 @@ image iplImg_to_image(IplImage* src)
             }
         }
     }
+    return im;
+}
+
+image matImg_to_image(cv::Mat m)
+{
+    IplImage ipl = m;
+    image im = iplImg_to_image(&ipl);
+    rgbgr_image(im);
     return im;
 }
 
@@ -397,6 +407,9 @@ image capture_image(struct frame_data *f)
 
     /* convert v4l2 raw image to Mat image */
 
+    image im;
+
+#if (defined MJPEG)
     IplImage* frame;
 
     CvMat cvmat = cvMat(480, 640, CV_8UC3, buffers[buf.index].start);
@@ -404,7 +417,7 @@ image capture_image(struct frame_data *f)
 
     /* convert IplImage to darknet image type */
 
-    image im = iplImg_to_image(frame);
+    im = iplImg_to_image(frame);
     rgbgr_image(im);
 
     /* With Queue Fetch */
@@ -415,8 +428,20 @@ image capture_image(struct frame_data *f)
             perror("Query Buffer");
         }
     }
+#elif (defined BGR24)
+    cv::Mat yuyv_frame, preview;
 
+    yuyv_frame = cv::Mat(480, 640, CV_8UC2, buffers[buf.index].start);
+
+    cv::cvtColor(yuyv_frame, preview, COLOR_YUV2BGR_YUY2);
+
+    im = matImg_to_image(preview);
+    //rgbgr_image(im);
+#endif
+
+#ifdef BUSY_WAITING
     pthread_join(select_thread, 0);
+#endif
 
     return im; /* return Image as darknet image type */
 
