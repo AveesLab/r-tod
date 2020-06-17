@@ -36,8 +36,8 @@
 #define CPU_TEMP_PATH "/sys/devices/virtual/thermal/thermal_zone0/temp"
 
 /* architecture */
-#define PARALLEL
-//#define SEQUENTIAL
+//#define PARALLEL
+#define SEQUENTIAL
 //#define CONTENTION_FREE 
 //#define ZERO_SLACK
 
@@ -126,7 +126,7 @@ int trace_iter = 1;
 static double trace_array[NUM_TRACE][iteration];
 
 pthread_mutex_t mutex_lock;
-int lock_offset = 5; // ms
+int lock_offset = 10; // ms
 static double detect_start;
 static double detect_end;
 static double detect_time;
@@ -246,6 +246,13 @@ int check_on_demand()
 
 void *fetch_in_thread(void *ptr)
 {
+
+#ifdef CONTENTION_FREE
+    usleep(lock_offset * 1000);
+    pthread_mutex_lock(&mutex_lock);
+    printf("fetch start\n");
+#endif
+
 #ifdef FIFO
     /* SCHED FIFO */
 
@@ -283,10 +290,6 @@ void *fetch_in_thread(void *ptr)
     usleep(fetch_offset * 1000);
 #endif
 
-#ifdef CONTENTION_FREE
-    usleep(lock_offset * 1000);
-    pthread_mutex_lock(&mutex_lock);
-#endif
 
     fetch_start = gettimeafterboot();
 
@@ -375,8 +378,6 @@ void *fetch_in_thread(void *ptr)
 
 void *detect_in_thread(void *ptr)
 {
-    /* offset setting */
-    usleep(fetch_offset * 1000);
 
 #ifdef FIFO
     /* SCHED FIFO */
@@ -443,11 +444,11 @@ void *detect_in_thread(void *ptr)
 #endif
     //printf("num_object : %d\n", num_object);
 
+    detect_time = gettimeafterboot() - detect_start;
+
 #ifdef CONTENTION_FREE
     pthread_mutex_unlock(&mutex_lock);
 #endif
-
-    detect_time = gettimeafterboot() - detect_start;
 
     if(cnt >= start_log)
     {
@@ -455,7 +456,6 @@ void *detect_in_thread(void *ptr)
         I_wakeup_delay_array[cnt-start_log] = I_wakeup_delay;
     }
 
-    //printf("Detect time : %f\n", detect_time);
     return 0;
 }
 
@@ -776,10 +776,6 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             /* Sequential or Contention free*/
             detect_in_thread(0);
 
-            if (nms) {
-                if (l.nms_kind == DEFAULT_NMS) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
-                else diounms_sort(local_dets, local_nboxes, l.classes, nms, l.nms_kind, l.beta_nms);
-            }
             show_img = det_img;
 #endif
 
@@ -1036,6 +1032,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             draw_bbox_array[cnt - start_log] = draw_bbox_time;
             d_blocking_array[cnt - start_log] = d_blocking_time;
 
+            printf("num_object : %d\n", num_object);
             //printf("slack: %f\n",slack[cnt-start_log]);
             //printf("latency: %f\n",latency[cnt-start_log]);
             printf("cnt : %d\n",cnt);
