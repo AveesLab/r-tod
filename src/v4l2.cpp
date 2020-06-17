@@ -27,8 +27,8 @@
 //#define BUSY_WAITING
 
 //#define DEBUG
-#define BGR24
-//#define MJPEG 
+//#define BGR24
+#define MJPEG 
 
 int fd;
 fd_set fds;
@@ -336,7 +336,6 @@ image capture_image(struct frame_data *f)
     tv.tv_sec = 2;
 
     double select_start = gettimeafterboot();
-    extern double select_time;
 
 #ifndef BUSY_WAITING
     if(-1 == select(fd+1, &fds, NULL, NULL, &tv))
@@ -375,7 +374,7 @@ image capture_image(struct frame_data *f)
 
 #endif
 
-    select_time= gettimeafterboot() - select_start;
+    f->select = gettimeafterboot() - select_start;
 
 
     if(-1 == xioctl(fd, VIDIOC_DQBUF, &buf))
