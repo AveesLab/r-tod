@@ -1025,6 +1025,7 @@ extern "C" {
                 for (j = 0; j < classes; ++j) {
                     int show = strncmp(names[j], "dont_show", 9);
                     if (dets[i].prob[j] > thresh && show) {
+                        k++;
                         if (class_id < 0) {
                             strcat(labelstr, names[j]);
                             class_id = j;
