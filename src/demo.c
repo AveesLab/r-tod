@@ -13,7 +13,6 @@
 #include "v4l2.h"
 #include "sched_utils.h"
 #include <sched.h>
-#include "cap.h"
 
 #ifdef WIN32
 #include <time.h>
