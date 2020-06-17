@@ -13,6 +13,8 @@
 #include "v4l2.h"
 #include "sched_utils.h"
 #include <sched.h>
+#include "cap.h"
+
 #ifdef WIN32
 #include <time.h>
 #include "gettimeofday.h"
@@ -24,6 +26,8 @@
 #define start_log 25
 #define cycle 1
 #define QLEN 4
+
+//#define TOY
 
 /* CPU & GPU information */
 #define NUM_TRACE 4 /* GPU power, CPU power, GPU temperature, CPU temperature */
@@ -97,6 +101,7 @@ static double I_wakeup_delay_array[iteration];
 static double D_wakeup_delay_array[iteration];
 static double D_wakeup_delay_array[iteration];
 static double draw_bbox_array[iteration];
+static double d_blocking_array[iteration];
 
 double frame_timestamp[3];
 static int buff_index=0;
@@ -139,6 +144,8 @@ static double F_wakeup_delay;
 static double I_wakeup_delay;
 static double D_wakeup_delay;
 static double draw_bbox_time;
+static double waitkey_start;
+double d_blocking_time;
 
 static char **demo_names;
 static image **demo_alphabet;
@@ -229,9 +236,17 @@ int check_on_demand()
     return on_demand;
 }
 
+#ifdef TOY
+void *cuda_in_thread(void *ptr)
+{
+    usleep(fetch_offset * 1000);
+    double start = gettimeafterboot();
+    vector_add_gpu();
+}
+#endif
+
 void *fetch_in_thread(void *ptr)
 {
-
 #ifdef FIFO
     /* SCHED FIFO */
 
@@ -262,13 +277,10 @@ void *fetch_in_thread(void *ptr)
 //    printf("Fetch cpu : %d\n", sched_getcpu());
 #endif
 
-    //	usleep(fetch_offset * 1000);
-
 #ifdef ZERO_SLACK
 
     /* Zero slack */
 
-    //printf("Fetch offset : %d\n", fetch_offset);
     usleep(fetch_offset * 1000);
 #endif
 
@@ -281,7 +293,6 @@ void *fetch_in_thread(void *ptr)
 
     F_wakeup_delay = fetch_start - cycle_end;
     //printf("Fetch wakeup delay : %f\n", F_wakeup_delay);
-    printf("Fetch start : %f\n", fetch_start);
 
 
     int dont_close_stream = 0;    // set 1 if your IP-camera periodically turns off and turns on video-stream
@@ -318,7 +329,7 @@ void *fetch_in_thread(void *ptr)
 
     image_waiting_time = frame[buff_index].frame_timestamp-fetch_start;
 
-    if(ondemand) transfer_delay = select_time - image_waiting_time;
+    if(ondemand) transfer_delay = frame[buff_index].select - image_waiting_time;
     else transfer_delay = .0;
 
     if (image_waiting_time < .0)
@@ -341,21 +352,21 @@ void *fetch_in_thread(void *ptr)
 
     //in_s = resize_image(in, net.w, net.h);
 
-    printf("Image time stamp : %f\n", frame[buff_index].frame_timestamp);
+    //printf("Image time stamp : %f\n", frame[buff_index].frame_timestamp);
 
     fetch_time = gettimeafterboot() - fetch_start;
 
     if(cnt >= start_log){
-        if(ondemand) fetch_array[cnt-start_log] = fetch_time - image_waiting_time;
+        if(ondemand) fetch_array[cnt-start_log] = fetch_time - image_waiting_time - transfer_delay;
         else fetch_array[cnt-start_log] = fetch_time;
 
         image_waiting_array[cnt-start_log] = image_waiting_time;
-        select_array[cnt-start_log] = select_time;
+        select_array[cnt-start_log] = frame[buff_index].select;
         inter_frame_gap_array[cnt-start_log] = inter_frame_gap;
         F_wakeup_delay_array[cnt-start_log] = F_wakeup_delay;
         transfer_delay_array[cnt-start_log] = transfer_delay;
 
-        //printf("select_time : %f\n", select_time);
+        //printf("select_time : %f\n", frame[buff_index].select);
         //printf("fetch_time : %f\n", fetch_array[cnt-start_log]);
         //printf("image waiting time : %f\n", image_waiting_time);
     }
@@ -365,6 +376,9 @@ void *fetch_in_thread(void *ptr)
 
 void *detect_in_thread(void *ptr)
 {
+    /* offset setting */
+    usleep(fetch_offset * 1000);
+
 #ifdef FIFO
     /* SCHED FIFO */
 
@@ -389,9 +403,8 @@ void *detect_in_thread(void *ptr)
     if (sched_setaffinity(0, sizeof(cpu_set_t), &mask) == -1)
     {
         perror("sched_setaffinity");
-//    }
+    }
 #endif
-
 
 #ifdef CONTENTION_FREE
     pthread_mutex_lock(&mutex_lock);
@@ -509,7 +522,6 @@ void *read_data()
     }
 
     read_time = gettimeafterboot() - read_start;
-    printf("read time : %f\n", read_time);
     return 0;
 }
 #endif
@@ -601,6 +613,9 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     pthread_t fetch_thread;
     pthread_t detect_thread;
     pthread_t trace_thread;
+#ifdef TOY
+    pthread_t cuda_thread;
+#endif
 
     ondemand = check_on_demand();
     //printf("ondemand : %d\n", ondemand);
@@ -703,6 +718,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     double D_wakeup_sum={0};
     double transfer_delay_sum={0};
     double draw_bbox_sum={0};
+    double d_blocking_sum={0};
+    double diff_sum={0};
 
 #ifdef CONTENTION_FREE
     pthread_mutex_init(&mutex_lock, NULL);
@@ -739,12 +756,13 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
 #ifdef PARALLEL 
             /* Sequential or Contention free */
+#if (defined TOY)
+            if(pthread_create(&cuda_thread, 0, cuda_in_thread, 0)) perror("Thread creation failed");
+#else
             if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
+#endif
             //if (nms) do_nms_obj(local_dets, local_nboxes, l.classes, nms);    // bad results
-            if (nms) {
-                if (l.nms_kind == DEFAULT_NMS) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
-                else diounms_sort(local_dets, local_nboxes, l.classes, nms, l.nms_kind, l.beta_nms);
-            }
+
 #endif
 
 #ifdef SEQUENTIAL
@@ -768,15 +786,26 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
             /* display thread */
 
-            cpu_set_t mask;
+            //usleep((fetch_offset) * 1000);
 
-            CPU_ZERO(&mask);
-            CPU_SET(2, &mask);
+            double display_start = gettimeafterboot();
 
-            if (sched_setaffinity(0, sizeof(cpu_set_t), &mask) == -1)
-            {
-                perror("sched_setaffinity");
+//            D_wakeup_delay = display_start - cycle_end;
+
+            if (nms) {
+                if (l.nms_kind == DEFAULT_NMS) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
+                else diounms_sort(local_dets, local_nboxes, l.classes, nms, l.nms_kind, l.beta_nms);
             }
+
+//            cpu_set_t mask;
+//
+//            CPU_ZERO(&mask);
+//            CPU_SET(2, &mask);
+//
+//            if (sched_setaffinity(0, sizeof(cpu_set_t), &mask) == -1)
+//            {
+//                perror("sched_setaffinity");
+//            }
 
 #ifdef FIFO
             /* SCHED FIFO */
@@ -806,11 +835,6 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             }
 #endif
 
-            double display_start = gettimeafterboot();
-
-            D_wakeup_delay = display_start - cycle_end;
-            //printf("Display wakeup delay : %f\n", D_wakeup_delay);
-
 #ifdef V4L2
             //if (!benchmark) draw_detections_v3(display, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
 
@@ -818,7 +842,6 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             free_detections(local_dets, local_nboxes);
 
             draw_bbox_time = gettimeafterboot() - display_start;
-            printf("Draw bbox time : %f\n", draw_bbox_time);
 
             /* Image display */
             display_in_thread(0);
@@ -848,6 +871,9 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             }
 
             if (!benchmark) draw_detections_cv_v3(show_img, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
+
+            draw_bbox_time = gettimeafterboot() - display_start;
+
             free_detections(local_dets, local_nboxes);
 
             printf("\nFPS:%.1f \t AVG_FPS:%.1f\n", fps, avg_fps);
@@ -855,7 +881,11 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             if(!prefix){
                 if (!dont_show) {
                     show_image_mat(show_img, "Demo");
+
+                    waitkey_start = gettimeafterboot();
                     int c = wait_key_cv(1);
+                    d_blocking_time = gettimeafterboot() - waitkey_start;
+
                     if (c == 10) {
                         if (frame_skip == 0) frame_skip = 60;
                         else if (frame_skip == 4) frame_skip = 0;
@@ -893,11 +923,16 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
             display_time = display_end - display_start; 
 
-            printf("display : %f\n", display_time);
+            //printf("display : %f\n", display_time);
 
 #ifndef CONTENTION_FREE
             /* Prallel or Sequential */
+#if (defined TOY)
+            pthread_join(cuda_thread, 0);
+#else
             pthread_join(detect_thread, 0);
+#endif
+
 #endif
 
 #ifdef TRACE
@@ -995,11 +1030,12 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             fps_array[cnt-start_log] = fps;
             cycle_time_array[cnt-start_log] = 1000./fps;
             latency[cnt-start_log]=display_end-frame[display_index].frame_timestamp;
-            display_array[cnt-start_log]=display_time;
+            display_array[cnt-start_log]=display_time - d_blocking_time;
             slack[cnt - start_log] = slack_time;
             num_object_array[cnt - start_log] = num_object;
             D_wakeup_delay_array[cnt - start_log] = D_wakeup_delay;
             draw_bbox_array[cnt - start_log] = draw_bbox_time;
+            d_blocking_array[cnt - start_log] = d_blocking_time;
 
             //printf("slack: %f\n",slack[cnt-start_log]);
             //printf("latency: %f\n",latency[cnt-start_log]);
@@ -1037,8 +1073,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
                     }
                 }
             }
-            fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n","b_w", "e_f", "e_i", "e_d", "slack", "fps", "latency", "select",
-                    "ifg", "cycle_time", "num_object", "transfer_delay", "draw_box", 
+            fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n","b_w", "e_f", "e_i", "e_d", "slack", "fps", "latency", "select",
+                    "ifg", "cycle_time", "num_object", "transfer_delay", "draw_box", "b_d", 
                     "GPU_Power", "CPU_Power", "GPU_temp", "CPU_temp");
 
             for(int i=0;i<iteration;i++){
@@ -1058,13 +1094,14 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 //                D_wakeup_sum += D_wakeup_delay_array[i];
                 transfer_delay_sum += transfer_delay_array[i];
                 draw_bbox_sum += draw_bbox_array[i];
+                d_blocking_sum += d_blocking_array[i];
 
                 for (int j = 0; j < NUM_TRACE; j++)
                     trace_data_sum[j] += trace_array[j][i];
 
-                fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%d,%f,%f,%f,%f,%f,%f\n",image_waiting_array[i],fetch_array[i],detect_array[i],display_array[i], 
+                fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",image_waiting_array[i],fetch_array[i],detect_array[i],display_array[i], 
                         slack[i], fps_array[i], latency[i], select_array[i], inter_frame_gap_array[i], cycle_time_array[i], num_object_array[i],
-                        transfer_delay_array[i], draw_bbox_array[i],
+                        transfer_delay_array[i], draw_bbox_array[i], d_blocking_array[i],
                         trace_array[0][i], trace_array[1][i], trace_array[2][i], trace_array[3][i]);
             }
             fclose(fp);
@@ -1093,6 +1130,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     printf("Avg num object : %f\n", (double)num_object_sum / iteration);
     printf("Avg Image transfer delay (ms) : %f\n", transfer_delay_sum / iteration);
     printf("Avg draw bbox time (ms) : %f\n", draw_bbox_sum / iteration);
+    printf("Avg display blocking time (ms) : %f\n", d_blocking_sum / iteration);
 //    printf("Avg fetch wakeup delay (ms) : %f\n", F_wakeup_sum / iteration);
 //    printf("Avg inference wakeup delay (ms) : %f\n", I_wakeup_sum / iteration);
 //    printf("Avg display wakeup delay (ms) : %f\n", D_wakeup_sum / iteration);
