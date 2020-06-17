@@ -236,14 +236,14 @@ int check_on_demand()
     return on_demand;
 }
 
-#ifdef TOY
-void *cuda_in_thread(void *ptr)
-{
-    usleep(fetch_offset * 1000);
-    double start = gettimeafterboot();
-    vector_add_gpu();
-}
-#endif
+//#ifdef TOY
+//void *cuda_in_thread(void *ptr)
+//{
+//    usleep(fetch_offset * 1000);
+//    double start = gettimeafterboot();
+//    vector_add_gpu();
+//}
+//#endif
 
 void *fetch_in_thread(void *ptr)
 {
@@ -613,9 +613,9 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     pthread_t fetch_thread;
     pthread_t detect_thread;
     pthread_t trace_thread;
-#ifdef TOY
-    pthread_t cuda_thread;
-#endif
+//#ifdef TOY
+//    pthread_t cuda_thread;
+//#endif
 
     ondemand = check_on_demand();
     //printf("ondemand : %d\n", ondemand);
@@ -756,11 +756,11 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
 #ifdef PARALLEL 
             /* Sequential or Contention free */
-#if (defined TOY)
-            if(pthread_create(&cuda_thread, 0, cuda_in_thread, 0)) perror("Thread creation failed");
-#else
+//#if (defined TOY)
+//            if(pthread_create(&cuda_thread, 0, cuda_in_thread, 0)) perror("Thread creation failed");
+//#else
             if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
-#endif
+//#endif
             //if (nms) do_nms_obj(local_dets, local_nboxes, l.classes, nms);    // bad results
 
 #endif
@@ -927,11 +927,11 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
 #ifndef CONTENTION_FREE
             /* Prallel or Sequential */
-#if (defined TOY)
-            pthread_join(cuda_thread, 0);
-#else
+//#if (defined TOY)
+//            pthread_join(cuda_thread, 0);
+//#else
             pthread_join(detect_thread, 0);
-#endif
+//#endif
 
 #endif
 
