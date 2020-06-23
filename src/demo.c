@@ -95,12 +95,9 @@ static int inter_frame_gap_array[iteration];
 static double cycle_time_array[iteration];
 static int num_object_array[iteration];
 static double transfer_delay_array[iteration];
-static double F_wakeup_delay_array[iteration];
-static double I_wakeup_delay_array[iteration];
-static double D_wakeup_delay_array[iteration];
-static double D_wakeup_delay_array[iteration];
 static double draw_bbox_array[iteration];
 static double d_blocking_array[iteration];
+static double i_gpu_array[iteration];
 
 double frame_timestamp[3];
 static int buff_index=0;
@@ -139,12 +136,10 @@ double select_time;
 static double slack_time;
 static double cycle_end;
 static double transfer_delay;
-static double F_wakeup_delay;
-static double I_wakeup_delay;
-static double D_wakeup_delay;
 static double draw_bbox_time;
 static double waitkey_start;
 double d_blocking_time;
+double detect_in_gpu;
 
 static char **demo_names;
 static image **demo_alphabet;
@@ -293,10 +288,6 @@ void *fetch_in_thread(void *ptr)
 
     fetch_start = gettimeafterboot();
 
-    F_wakeup_delay = fetch_start - cycle_end;
-    //printf("Fetch wakeup delay : %f\n", F_wakeup_delay);
-
-
     int dont_close_stream = 0;    // set 1 if your IP-camera periodically turns off and turns on video-stream
     if(letter_box)
         in_s = get_image_from_stream_letterbox(cap, net.w, net.h, net.c, &in_img, dont_close_stream);
@@ -365,7 +356,6 @@ void *fetch_in_thread(void *ptr)
         image_waiting_array[cnt-start_log] = image_waiting_time;
         select_array[cnt-start_log] = frame[buff_index].select;
         inter_frame_gap_array[cnt-start_log] = inter_frame_gap;
-        F_wakeup_delay_array[cnt-start_log] = F_wakeup_delay;
         transfer_delay_array[cnt-start_log] = transfer_delay;
 
         //printf("select_time : %f\n", frame[buff_index].select);
@@ -413,8 +403,6 @@ void *detect_in_thread(void *ptr)
     // show_image_cv(det_img, "test");
     detect_start = gettimeafterboot();
 
-    I_wakeup_delay = detect_start - cycle_end;
-    //printf("Inference wakeup delay : %f\n", I_wakeup_delay);
 
     layer l = net.layers[net.n-1];
 #ifdef V4L2
@@ -423,6 +411,8 @@ void *detect_in_thread(void *ptr)
     float *X = det_s.data;
 #endif
     float *prediction = network_predict(net, X);
+
+    double i_cpu = gettimeafterboot();
 
     memcpy(predictions[demo_index], prediction, l.outputs*sizeof(float));
     mean_arrays(predictions, NFRAMES, l.outputs, avg);
@@ -445,6 +435,9 @@ void *detect_in_thread(void *ptr)
     //printf("num_object : %d\n", num_object);
 
     detect_time = gettimeafterboot() - detect_start;
+//    printf("detect_time : %f\n", detect_time);
+//    printf("detect in gpu : %f\n", detect_in_gpu);
+//    printf("detect in cpu : %f\n", gettimeafterboot() - i_cpu);
 
 #ifdef CONTENTION_FREE
     pthread_mutex_unlock(&mutex_lock);
@@ -452,8 +445,8 @@ void *detect_in_thread(void *ptr)
 
     if(cnt >= start_log)
     {
-        detect_array[cnt-start_log] = detect_time;
-        I_wakeup_delay_array[cnt-start_log] = I_wakeup_delay;
+        detect_array[cnt - start_log] = detect_time;
+        i_gpu_array[cnt - start_log] = detect_in_gpu;
     }
 
     return 0;
@@ -682,23 +675,6 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     float avg_fps = 0;
     int frame_counter = 0;
 
-    //	double image_waiting_sum[cycle]={0};
-    //	double fetch_sum[cycle]={0};
-    //	double detect_sum[cycle]={0};
-    //	double display_sum[cycle]={0};
-    //	double slack_sum[cycle]={0};
-    //	double fps_sum[cycle]={0};
-    //	double latency_sum[cycle]={0};
-    //	double select_sum[cycle]={0};
-    //	double trace_data_sum[NUM_TRACE]={0};
-    //	int inter_frame_gap_sum[cycle]={0};
-    //	double cycle_time_sum[cycle]={0};
-    //	double fps_buff[3];
-    //	int num_object_sum[cycle]={0};
-    //	double F_wakeup_sum[cycle]={0};
-    //	double I_wakeup_sum[cycle]={0};
-    //	double D_wakeup_sum[cycle]={0};
-
     double image_waiting_sum={0};
     double fetch_sum={0};
     double detect_sum={0};
@@ -719,6 +695,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     double draw_bbox_sum={0};
     double d_blocking_sum={0};
     double diff_sum={0};
+    double i_gpu_sum={0};
 
 #ifdef CONTENTION_FREE
     pthread_mutex_init(&mutex_lock, NULL);
@@ -785,7 +762,6 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
             double display_start = gettimeafterboot();
 
-//            D_wakeup_delay = display_start - cycle_end;
 
             if (nms) {
                 if (l.nms_kind == DEFAULT_NMS) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
@@ -1028,7 +1004,6 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             display_array[cnt-start_log]=display_time - d_blocking_time;
             slack[cnt - start_log] = slack_time;
             num_object_array[cnt - start_log] = num_object;
-            D_wakeup_delay_array[cnt - start_log] = D_wakeup_delay;
             draw_bbox_array[cnt - start_log] = draw_bbox_time;
             d_blocking_array[cnt - start_log] = d_blocking_time;
 
@@ -1069,8 +1044,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
                     }
                 }
             }
-            fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n","b_w", "e_f", "e_i", "e_d", "slack", "fps", "latency", "select",
-                    "ifg", "cycle_time", "num_object", "transfer_delay", "draw_box", "b_d", 
+            fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n","b_w", "e_f", "e_i", "e_d", "slack", "fps", "latency", "select",
+                    "ifg", "cycle_time", "num_object", "transfer_delay", "draw_box", "b_d", "i_gpu", 
                     "GPU_Power", "CPU_Power", "GPU_temp", "CPU_temp");
 
             for(int i=0;i<iteration;i++){
@@ -1085,19 +1060,17 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
                 inter_frame_gap_sum += inter_frame_gap_array[i];
                 cycle_time_sum += cycle_time_array[i];
                 num_object_sum += num_object_array[i];
-//                F_wakeup_sum += F_wakeup_delay_array[i];
-//                I_wakeup_sum += I_wakeup_delay_array[i];
-//                D_wakeup_sum += D_wakeup_delay_array[i];
                 transfer_delay_sum += transfer_delay_array[i];
                 draw_bbox_sum += draw_bbox_array[i];
                 d_blocking_sum += d_blocking_array[i];
+                i_gpu_sum += i_gpu_array[i];
 
                 for (int j = 0; j < NUM_TRACE; j++)
                     trace_data_sum[j] += trace_array[j][i];
 
-                fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",image_waiting_array[i],fetch_array[i],detect_array[i],display_array[i], 
+                fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%d,%f,%f,%f,%f,%f,%f,%f,%f\n",image_waiting_array[i],fetch_array[i],detect_array[i],display_array[i], 
                         slack[i], fps_array[i], latency[i], select_array[i], inter_frame_gap_array[i], cycle_time_array[i], num_object_array[i],
-                        transfer_delay_array[i], draw_bbox_array[i], d_blocking_array[i],
+                        transfer_delay_array[i], draw_bbox_array[i], d_blocking_array[i], i_gpu_array[i],
                         trace_array[0][i], trace_array[1][i], trace_array[2][i], trace_array[3][i]);
             }
             fclose(fp);
@@ -1127,6 +1100,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     printf("Avg Image transfer delay (ms) : %f\n", transfer_delay_sum / iteration);
     printf("Avg draw bbox time (ms) : %f\n", draw_bbox_sum / iteration);
     printf("Avg display blocking time (ms) : %f\n", d_blocking_sum / iteration);
+    printf("Avg inference gpu time (ms) : %f\n", i_gpu_sum / iteration);
 //    printf("Avg fetch wakeup delay (ms) : %f\n", F_wakeup_sum / iteration);
 //    printf("Avg inference wakeup delay (ms) : %f\n", I_wakeup_sum / iteration);
 //    printf("Avg display wakeup delay (ms) : %f\n", D_wakeup_sum / iteration);
