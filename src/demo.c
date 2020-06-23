@@ -11,7 +11,6 @@
 #include "demo.h"
 #include "darknet.h"
 #include "v4l2.h"
-#include "sched_utils.h"
 #include <sched.h>
 
 #ifdef WIN32
