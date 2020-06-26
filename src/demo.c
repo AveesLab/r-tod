@@ -21,7 +21,7 @@
 #endif
 
 #define iteration 1000
-#define start_log 25
+#define start_log 0
 #define cycle 1
 #define QLEN 4
 
@@ -35,8 +35,8 @@
 #define CPU_TEMP_PATH "/sys/devices/virtual/thermal/thermal_zone0/temp"
 
 /* architecture */
-//#define PARALLEL
-#define SEQUENTIAL
+#define PARALLEL
+//#define SEQUENTIAL
 //#define CONTENTION_FREE 
 //#define ZERO_SLACK
 
@@ -97,6 +97,7 @@ static double transfer_delay_array[iteration];
 static double draw_bbox_array[iteration];
 static double d_blocking_array[iteration];
 static double i_gpu_array[iteration];
+static int i_dets_array[iteration];
 
 double frame_timestamp[3];
 static int buff_index=0;
@@ -230,12 +231,12 @@ int check_on_demand()
 }
 
 //#ifdef TOY
-//void *cuda_in_thread(void *ptr)
-//{
-//    usleep(fetch_offset * 1000);
-//    double start = gettimeafterboot();
-//    vector_add_gpu();
-//}
+void *cuda_in_thread(void *ptr)
+{
+    usleep(fetch_offset * 1000);
+    double start = gettimeafterboot();
+    vector_add_gpu();
+}
 //#endif
 
 void *fetch_in_thread(void *ptr)
@@ -244,7 +245,7 @@ void *fetch_in_thread(void *ptr)
 #ifdef CONTENTION_FREE
     usleep(lock_offset * 1000);
     pthread_mutex_lock(&mutex_lock);
-    printf("fetch start\n");
+    //printf("fetch start\n");
 #endif
 
 #ifdef FIFO
@@ -446,6 +447,7 @@ void *detect_in_thread(void *ptr)
     {
         detect_array[cnt - start_log] = detect_time;
         i_gpu_array[cnt - start_log] = detect_in_gpu;
+        i_dets_array[cnt - start_log] = nboxes;
     }
 
     return 0;
@@ -605,7 +607,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     pthread_t detect_thread;
     pthread_t trace_thread;
 //#ifdef TOY
-//    pthread_t cuda_thread;
+    pthread_t cuda_thread;
 //#endif
 
     ondemand = check_on_demand();
@@ -717,6 +719,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 #endif
             const float nms = .45;    // 0.4F
             int local_nboxes = nboxes;
+            printf("local detections : %d\n", local_nboxes);
             detection *local_dets = dets;
 
 #ifndef SEQUENTIAL
@@ -736,6 +739,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 //#else
             if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
 //#endif
+
             //if (nms) do_nms_obj(local_dets, local_nboxes, l.classes, nms);    // bad results
 
 #endif
@@ -761,21 +765,10 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
             double display_start = gettimeafterboot();
 
-
             if (nms) {
                 if (l.nms_kind == DEFAULT_NMS) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
                 else diounms_sort(local_dets, local_nboxes, l.classes, nms, l.nms_kind, l.beta_nms);
             }
-
-//            cpu_set_t mask;
-//
-//            CPU_ZERO(&mask);
-//            CPU_SET(2, &mask);
-//
-//            if (sched_setaffinity(0, sizeof(cpu_set_t), &mask) == -1)
-//            {
-//                perror("sched_setaffinity");
-//            }
 
 #ifdef FIFO
             /* SCHED FIFO */
@@ -1006,7 +999,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             draw_bbox_array[cnt - start_log] = draw_bbox_time;
             d_blocking_array[cnt - start_log] = d_blocking_time;
 
-            printf("num_object : %d\n", num_object);
+            //printf("num_object : %d\n", num_object);
             //printf("slack: %f\n",slack[cnt-start_log]);
             //printf("latency: %f\n",latency[cnt-start_log]);
             printf("cnt : %d\n",cnt);
@@ -1043,8 +1036,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
                     }
                 }
             }
-            fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n","b_w", "e_f", "e_i", "e_d", "slack", "fps", "latency", "select",
-                    "ifg", "cycle_time", "num_object", "transfer_delay", "draw_box", "b_d", "i_gpu", 
+            fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n","b_w", "e_f", "e_i", "e_d", "slack", "fps", "latency", "select","ifg","cycle_time", 
+                    "num_object", "transfer_delay", "draw_box", "b_d", "i_gpu", "i_dets",
                     "GPU_Power", "CPU_Power", "GPU_temp", "CPU_temp");
 
             for(int i=0;i<iteration;i++){
@@ -1067,9 +1060,9 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
                 for (int j = 0; j < NUM_TRACE; j++)
                     trace_data_sum[j] += trace_array[j][i];
 
-                fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%d,%f,%f,%f,%f,%f,%f,%f,%f\n",image_waiting_array[i],fetch_array[i],detect_array[i],display_array[i], 
+                fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%d,%f,%f,%f,%f,%d,%f,%f,%f,%f\n",image_waiting_array[i],fetch_array[i],detect_array[i],display_array[i], 
                         slack[i], fps_array[i], latency[i], select_array[i], inter_frame_gap_array[i], cycle_time_array[i], num_object_array[i],
-                        transfer_delay_array[i], draw_bbox_array[i], d_blocking_array[i], i_gpu_array[i],
+                        transfer_delay_array[i], draw_bbox_array[i], d_blocking_array[i], i_gpu_array[i], i_dets_array[i],
                         trace_array[0][i], trace_array[1][i], trace_array[2][i], trace_array[3][i]);
             }
             fclose(fp);
