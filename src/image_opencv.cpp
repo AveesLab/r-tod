@@ -79,9 +79,6 @@ using std::endl;
 #define CV_AA cv::LINE_AA
 #endif
 
-int buff_index = 0;
-cv::Mat mat_img[3];
-
 extern "C" {
 
     //struct mat_cv : cv::Mat {  };
@@ -446,7 +443,7 @@ extern "C" {
 //        int c = cv::waitKey(1);
 //        if (c != -1) c = c%256;
         double waitkey_start;
-        extern double d_blocking_time;
+        extern double b_disp;
 
         try {
             image copy = copy_image(p);
@@ -457,9 +454,9 @@ extern "C" {
             else if (mat.channels() == 4) cv::cvtColor(mat, mat, cv::COLOR_RGBA2BGR);
             cv::namedWindow(name, cv::WINDOW_NORMAL);
             cv::imshow(name, mat);
-            waitkey_start = gettimeafterboot();
+            waitkey_start = gettime_after_boot();
             int c = cv::waitKey(1);
-            d_blocking_time = gettimeafterboot() - waitkey_start;
+            b_disp = gettime_after_boot() - waitkey_start;
 
             free_image(copy);
 
@@ -886,49 +883,6 @@ extern "C" {
     }
 
     // ----------------------------------------
-
-    extern "C" image get_image_from_v4l2(int w, int h, int c, mat_cv** in_img, int dont_close, struct frame_data *f)
-    {
-        c = c ? c : 3;
-        cv::Mat *src = NULL;
-        image img;
-        static int once = 1;
-        if (once) {
-            once = 0;
-            do {
-                if (src) delete src;
-                printf("capture\n");
-                img = capture_image(f);
-                printf("capture\n");
-                show_image_cv(img, "im");
-                mat_img[buff_index] = image_to_mat(img);
-                src = (cv::Mat*)(mat_img + buff_index);
-
-                if (!src) return make_empty_image(0, 0, 0);
-            } while (src->cols < 1 || src->rows < 1 || src->channels() < 1);
-            printf("Video stream: %d x %d \n", src->cols, src->rows);
-        }
-        else
-        {
-            img = capture_image(f);
-            mat_img[buff_index] = image_to_mat(img);
-            src = (cv::Mat*)(mat_img + buff_index);
-        }
-
-        *in_img = (mat_cv *)new cv::Mat(src->rows, src->cols, CV_8UC(c));
-        cv::resize(*src, **(cv::Mat**)in_img, (*(cv::Mat**)in_img)->size(), 0, 0, cv::INTER_LINEAR);
-
-        if (c>1) cv::cvtColor(*src, *src, cv::COLOR_RGB2BGR);
-        image tmp = mat_to_image(*src);
-        image im = letterbox_image(tmp, w, h);
-        free_image(tmp);
-        release_mat((mat_cv **)&src);
-
-        //show_image_cv(im, "im");
-        buff_index = (buff_index + 1) % 3;
-        show_image_mat(*in_img, "in_img");
-        return im;
-    }
 
     // ----------------------------------------
 

@@ -322,7 +322,7 @@ image capture_image(struct frame_data *f)
     /* On demand Fetch */
 
     if(on_demand){
-        //printf("QBUF time (ms) : %f\n", gettimeafterboot());
+        //printf("QBUF time (ms) : %f\n", gettime_after_boot());
         if(-1 == xioctl(fd, VIDIOC_QBUF, &buf))
         {
             perror("Query Buffer");
@@ -335,7 +335,7 @@ image capture_image(struct frame_data *f)
     //    struct timeval tv = {0};
     tv.tv_sec = 2;
 
-    double select_start = gettimeafterboot();
+    double select_start = gettime_after_boot();
 
 #ifndef BUSY_WAITING
     if(-1 == select(fd+1, &fds, NULL, NULL, &tv))
@@ -374,7 +374,7 @@ image capture_image(struct frame_data *f)
 
 #endif
 
-    f->select = gettimeafterboot() - select_start;
+    f->select = gettime_after_boot() - select_start;
 
 
     if(-1 == xioctl(fd, VIDIOC_DQBUF, &buf))
@@ -421,7 +421,7 @@ image capture_image(struct frame_data *f)
 
     /* With Queue Fetch */
     if(!on_demand){
-        //printf("with queue QBUF time (ms) : %f\n", gettimeafterboot());
+        //printf("with queue QBUF time (ms) : %f\n", gettime_after_boot());
         if(-1 == xioctl(fd, VIDIOC_QBUF, &buf))
         {
             perror("Query Buffer");
@@ -466,7 +466,7 @@ image capture_image(struct frame_data *f)
 //	/* On demand Fetch */
 //
 //	if(on_demand){
-//		//printf("QBUF time (ms) : %f\n", gettimeafterboot());
+//		//printf("QBUF time (ms) : %f\n", gettime_after_boot());
 //		if(-1 == xioctl(fd, VIDIOC_QBUF, &buf))
 //		{
 //			perror("Query Buffer");
@@ -479,7 +479,7 @@ image capture_image(struct frame_data *f)
 //    struct timeval tv = {0};
 //    tv.tv_sec = 2;
 //	
-//	double select_start = gettimeafterboot();
+//	double select_start = gettime_after_boot();
 //	extern double select_time;
 //
 //    if(-1 == select(fd+1, &fds, NULL, NULL, &tv))
@@ -487,7 +487,7 @@ image capture_image(struct frame_data *f)
 //        perror("Waiting for Frame");
 //    }
 //
-//	select_time= gettimeafterboot() - select_start;
+//	select_time= gettime_after_boot() - select_start;
 //
 //
 //    if(-1 == xioctl(fd, VIDIOC_DQBUF, &buf))
@@ -549,7 +549,7 @@ image capture_image(struct frame_data *f)
 //
 //	/* With Queue Fetch */
 //	if(!on_demand){
-//		//printf("with queue QBUF time (ms) : %f\n", gettimeafterboot());
+//		//printf("with queue QBUF time (ms) : %f\n", gettime_after_boot());
 //		if(-1 == xioctl(fd, VIDIOC_QBUF, &buf))
 //		{
 //			perror("Query Buffer");

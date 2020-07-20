@@ -61,7 +61,7 @@ int time_comparator(const void *pa, const void *pb)
 
 void forward_network_gpu(network net, network_state state)
 {
-    extern double detect_in_gpu;
+    extern double e_infer_gpu;
 
     static time_benchmark_layers *avg_time_per_layer = NULL;
     static time_benchmark_layers *sorted_avg_time_per_layer = NULL;
@@ -77,7 +77,7 @@ void forward_network_gpu(network net, network_state state)
     //printf("\n");
     state.workspace = net.workspace;
     int i;
-    gpu_kernel_start = gettimeafterboot();
+    gpu_kernel_start = gettime_after_boot();
     for(i = 0; i < net.n; ++i){
         state.index = i;
         layer l = net.layers[i];
@@ -139,9 +139,9 @@ void forward_network_gpu(network net, network_state state)
             cvDestroyAllWindows();
         }
 */
-    if(l.type == REGION) detect_in_gpu = gettimeafterboot() - gpu_kernel_start; // v2
+    if(l.type == REGION) e_infer_gpu = gettime_after_boot() - gpu_kernel_start; // v2
     }
-        //printf("detect in gpu : %f\n", detect_in_gpu);
+        //printf("detect in gpu : %f\n", e_infer_gpu);
 
     if (net.benchmark_layers) {
         printf("\n\nSorted by time (forward):\n");
@@ -652,9 +652,9 @@ float *get_network_output_layer_gpu(network net, int i)
     /* v3 & v4 */
     if(l.type != REGION)
     {
-        extern double detect_in_gpu;
+        extern double e_infer_gpu;
         cuda_pull_array(l.output_gpu, l.output, l.outputs*l.batch);
-        detect_in_gpu = gettimeafterboot() - gpu_kernel_start;
+        e_infer_gpu = gettime_after_boot() - gpu_kernel_start;
     }
     return l.output;
 }

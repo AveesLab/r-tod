@@ -1016,7 +1016,7 @@ void show_total_time();
 LIB_API void init_cpu();
 
 
-double gettimeafterboot();
+double gettime_after_boot();
 
 struct frame_data {
 	image frame;
@@ -1025,6 +1025,7 @@ struct frame_data {
 	size_t length;
 	double frame_timestamp;
 	int frame_sequence;
+    double select;
 };
 
 #ifndef V4L2_H
@@ -1040,7 +1041,10 @@ image capture_image(struct frame_data *f);
 int set_framerate(int fd, int fps);
 
 int open_device(char *cam_dev, int fps, int w, int h);
+
 #endif
+
+void vector_add_gpu();
 
 #ifdef __cplusplus
 }

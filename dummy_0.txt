@@ -1,0 +1,251 @@
+Getdevice count : 44193549.494328
+ CUDNN_HALF=1 
+Demo
+net.optimized_memory = 0 
+mini_batch = 1, batch = 1, time_steps = 1, train = 0 
+
+ reorg_old 
+
+ seen 32, trained: 32013 K-images (500 Kilo-batches_64) 
+demo start : 44193549.490904
+Webcam index: 0
+cam dev : /dev/video0
+Driver Caps:
+  Driver: "uvcvideo"
+  Card: "C922 Pro Stream Webcam"
+  Bus: "usb-3610000.xhci-4.1"
+  Version: 1.0
+  Capabilities: 84200001
+Camera Cropping:
+  Bounds: 640x480+0+0
+  Default: 640x480+0+0
+  Aspect: 1/1
+  FMT : CE Desc
+--------------------
+  YUYV:    YUYV 4:2:2
+  MJPG: C  Motion-JPEG
+Selected Camera Mode:
+  Width: 640
+  Height: 480
+  PixFmt: MJPG
+  Field: 1
+=============================
+Camera FPS : 30.000000
+=============================
+got data in buff 0, len=614400, flags=0x12001, seq=0, used=51514)
+lock finish : 0.608310
+lock finish : 2.098443
+================start================
+Fetch start : 44199602.862691
+Display start : 6053.410988
+cuda start : 44199603.138605
+vector add gpu start 
+waitkey_start - show_blocking_time : 0.324908
+Window 
+lock finish : 2.004328
+got data in buff 0, len=614400, flags=0x12001, seq=9, used=54440)
+vector add gpu end 
+cuda time : 54.676051
+Image time stamp : 44199621.231000
+lock finish : 70.725685
+Display end : 6151.508476
+display : 98.111345
+cycle end : 44199701.046518
+FPS : 10.167668
+cnt : 0
+================end===============
+================start================
+Display start : 6151.880874
+cuda start : 44199702.323460
+vector add gpu start 
+Fetch start : 44199704.060387
+waitkey_start - show_blocking_time : 0.516754
+Window 
+lock finish : 10.025674
+lock finish : 0.077603
+got data in buff 0, len=614400, flags=0x12001, seq=12, used=53437)
+Display end : 6184.024816
+display : 32.155783
+vector add gpu end 
+cuda time : 58.391673
+Image time stamp : 44199721.237000
+cycle end : 44199765.543083
+FPS : 15.502840
+cnt : 1
+================end===============
+================start================
+Display start : 6216.256890
+Fetch start : 44199767.523634
+cuda start : 44199767.690232
+vector add gpu start 
+waitkey_start - show_blocking_time : 0.163846
+Window 
+got data in buff 0, len=614400, flags=0x12001, seq=14, used=53433)
+Image time stamp : 44199789.233000
+vector add gpu end 
+cuda time : 53.407589
+lock finish : 50.285268
+lock finish : 0.103492
+Display end : 6280.519686
+display : 64.271917
+cycle end : 44199830.021119
+FPS : 15.518291
+cnt : 2
+================end===============
+================start================
+Fetch start : 44199830.128867
+Display start : 6280.691437
+cuda start : 44199830.293865
+vector add gpu start 
+waitkey_start - show_blocking_time : 0.143269
+Window 
+got data in buff 0, len=614400, flags=0x12001, seq=16, used=53607)
+Image time stamp : 44199853.233000
+vector add gpu end 
+cuda time : 53.010198
+lock finish : 63.060225
+lock finish : 0.049314
+Display end : 6354.400334
+display : 73.732929
+cycle end : 44199903.919527
+FPS : 13.531886
+cnt : 3
+================end===============
+================start================
+Display start : 6354.572468
+cuda start : 44199904.144335
+vector add gpu start 
+Fetch start : 44199904.215921
+waitkey_start - show_blocking_time : 0.202215
+Window 
+got data in buff 0, len=614400, flags=0x12001, seq=18, used=53468)
+Image time stamp : 44199921.234000
+vector add gpu end 
+cuda time : 53.281792
+lock finish : 66.055853
+lock finish : 0.091651
+Display end : 6426.162440
+display : 71.598516
+cycle end : 44199975.665217
+FPS : 13.938324
+cnt : 4
+================end===============
+================start================
+Fetch start : 44199975.776645
+Display start : 6426.317102
+cuda start : 44199976.037838
+vector add gpu start 
+waitkey_start - show_blocking_time : 0.205416
+Window 
+got data in buff 0, len=614400, flags=0x12001, seq=20, used=52279)
+Image time stamp : 44199989.242000
+vector add gpu end 
+cuda time : 53.039256
+lock finish : 64.326607
+lock finish : 0.089891
+Display end : 6496.027999
+display : 69.736434
+cycle end : 44200045.547000
+FPS : 14.309828
+cnt : 5
+================end===============
+================start================
+Fetch start : 44200045.680509
+Display start : 6496.240423
+cuda start : 44200045.789665
+vector add gpu start 
+waitkey_start - show_blocking_time : 0.169670
+Window 
+got data in buff 0, len=614400, flags=0x12001, seq=22, used=51446)
+Image time stamp : 44200053.245000
+vector add gpu end 
+cuda time : 53.651758
+lock finish : 65.463960
+lock finish : 0.097604
+Display end : 6566.899578
+display : 70.673588
+cycle end : 44200116.441940
+FPS : 14.105093
+cnt : 6
+================end===============
+================start================
+Fetch start : 44200116.573240
+Display start : 6567.146147
+cuda start : 44200116.687964
+vector add gpu start 
+waitkey_start - show_blocking_time : 0.173542
+Window 
+got data in buff 0, len=614400, flags=0x12001, seq=24, used=50849)
+Image time stamp : 44200121.256000
+vector add gpu end 
+cuda time : 53.069274
+lock finish : 61.632973
+lock finish : 0.068738
+Display end : 6633.969804
+display : 66.832970
+cycle end : 44200183.472132
+FPS : 14.918950
+cnt : 7
+================end===============
+================start================
+Fetch start : 44200183.619337
+Display start : 6634.164115
+cuda start : 44200183.706124
+vector add gpu start 
+waitkey_start - show_blocking_time : 0.199975
+Window 
+got data in buff 0, len=614400, flags=0x12001, seq=26, used=50661)
+Image time stamp : 44200189.248000
+vector add gpu end 
+cuda time : 53.244352
+lock finish : 64.945317
+lock finish : 0.052738
+Display end : 6704.345237
+display : 70.189539
+cycle end : 44200253.870254
+FPS : 14.204873
+cnt : 8
+================end===============
+================start================
+Fetch start : 44200253.987058
+Display start : 6704.501786
+cuda start : 44200254.059317
+vector add gpu start 
+waitkey_start - show_blocking_time : 0.180039
+Window 
+got data in buff 0, len=614400, flags=0x12001, seq=29, used=50865)
+vector add gpu end 
+cuda time : 53.765810
+Image time stamp : 44200289.248000
+lock finish : 65.574652
+lock finish : 0.095683
+Display end : 6775.401430
+display : 70.910812
+cycle end : 44200324.906351
+FPS : 14.077388
+cnt : 9
+============ Darknet data ===========
+Avg image waiting (ms): 16.397871
+Avg fetch (ms) : 32.154897
+Avg detect (ms) : 0.000000
+Avg display (ms) : 68.821383
+Avg slack (ms) : 20.268616
+Avg fps : 12.615526
+Avg latency (ms) : 8840099.835391
+Avg select (ms) : 26.395457
+Avg inter frame gap : 2.900000
+Avg cycle time (ms) : 97.258331
+Avg num object : 0.000000
+Avg Image transfer delay (ms) : 9.997586
+Avg draw bbox time (ms) : 0.003796
+Avg display blocking time (ms) : 60.690120
+=====================================
+input video stream closed. 
+j = 0
+NAFRAMES = 3
+j = 1
+NAFRAMES = 3
+j = 2
+NAFRAMES = 3
+4
+5

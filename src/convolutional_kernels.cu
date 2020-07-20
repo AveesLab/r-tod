@@ -11,6 +11,7 @@
 #include "utils.h"
 #include "dark_cuda.h"
 #include "box.h"
+#include "darknet.h"
 
 
 __global__ void binarize_kernel(float *x, int n, float *binary)

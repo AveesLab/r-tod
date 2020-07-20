@@ -751,6 +751,7 @@ detection *make_network_boxes(network *net, float thresh, int *num)
     int i;
     int nboxes = num_detections(net, thresh);
     if (num) *num = nboxes;
+
     detection* dets = (detection*)xcalloc(nboxes, sizeof(detection));
     for (i = 0; i < nboxes; ++i) {
         dets[i].prob = (float*)xcalloc(l.classes, sizeof(float));

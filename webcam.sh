@@ -16,7 +16,7 @@ then
 
 #DBUS_FATAL_WARNINGS=0 ./darknet detector demo cfg/coco.data $1 $2 -c ${3-0} -fps ${4-30} -w ${5-640} -h ${6-480}
 #./darknet detector demo cfg/coco.data $1 $2 -c ${3-0} -fps ${4-30} -w ${5-640} -h ${6-480}
-	./darknet detector demo cfg/coco.data $1 $2 -c ${3-0} -offset ${4-0}
+	./darknet detector demo cfg/coco.data $1 $2 -c ${3-0} -offset ${4-0} -thresh ${5-.2}
 
 fi
 

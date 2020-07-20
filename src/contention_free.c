@@ -8,7 +8,7 @@
 #include "box.h"
 #include "image.h"
 #include "image_opencv.h"
-#include "demo.h"
+#include "r_tod.h"
 #include "darknet.h"
 #include "v4l2.h"
 #include <sched.h>
@@ -28,11 +28,11 @@
 
 #include "http_stream.h"
 
-extern int buff_index=0;
-extern int cnt = 0;
-extern double cycle_array[QLEN] = {0,};
-extern int ondemand = 1;
-extern int num_object = 0;
+#ifdef ZERO_SLACK
+extern double s_min = 10000.;
+extern double e_fetch_max = 0;
+extern double b_fetch_max = 0;
+#endif
 
 extern mat_cv* in_img;
 extern mat_cv* det_img;
@@ -40,173 +40,64 @@ extern mat_cv* show_img;
 extern image in_s ;
 extern image det_s;
 
-extern int nboxes = 0;
-extern detection *dets = NULL;
-
-extern float fps = 0;
-extern float demo_thresh = 0;
-extern int demo_ext_output = 0;
-extern long long int frame_id = 0;
-extern int demo_json_port = -1;
-extern int demo_index = 0;
-extern int letter_box = 0;
-extern int fetch_offset; // zero slack
-
-extern double e_fetch_sum = 0;
-extern double b_fetch_sum = 0;
-extern double d_fetch_sum = 0;
-extern double e_infer_cpu_sum = 0;
-extern double e_infer_gpu_sum = 0;
-extern double d_infer_sum = 0;
-extern double e_disp_sum = 0;
-extern double b_disp_sum = 0;
-extern double d_disp_sum = 0;
-extern double slack_sum = 0;
-extern double e2e_delay_sum = 0;
-extern double fps_sum = 0;
-extern double cycle_time_sum = 0;
-extern double inter_frame_gap_sum = 0;
-extern double num_object_sum = 0;
-extern double trace_data_sum = 0;
-
-int get_rand_offset(int a, int b)
+double gettime_after_boot()
 {
-    return rand() % (a + 1 - b) + b;
+    struct timespec time_after_boot;
+    clock_gettime(CLOCK_MONOTONIC,&time_after_boot);
+    return (time_after_boot.tv_sec*1000+time_after_boot.tv_nsec*0.000001);
 }
 
-void *fetch_in_thread(void *ptr)
+int check_on_demand()
 {
-    usleep(fetch_offset * 1000);
+    int env_var_int;
+    char *env_var;
+    static int size;
+    int on_demand;
 
-    fetch_start = gettime_after_boot();
-
-    int dont_close_stream = 0;    // set 1 if your IP-camera periodically turns off and turns on video-stream
-    if(letter_box)
-        in_s = get_image_from_stream_letterbox(cap, net.w, net.h, net.c, &in_img, dont_close_stream);
-    else{
-#ifdef V4L2
-        frame[buff_index].frame = capture_image(&frame[buff_index]);
-        letterbox_image_into(frame[buff_index].frame, net.w, net.h, frame[buff_index].resize_frame);
-        //frame[buff_index].resize_frame = letterbox_image(frame[buff_index].frame, net.w, net.h);
-        //show_image_cv(frame[buff_index].resize_frame,"im");
-
-        if(!frame[buff_index].resize_frame.data){
-            printf("Stream closed.\n");
-            flag_exit = 1;
-            //exit(EXIT_FAILURE);
-            return 0;
-        }
+#if (defined V4L2)
+    env_var = getenv("V4L2_QLEN");
 #else
-        in_s = get_image_from_stream_resize_with_timestamp(cap, net.w, net.h, net.c, &in_img, dont_close_stream, &frame[buff_index]);
-        //        in_s = get_image_from_v4l2(net.w, net.h, net.c, &in_img, dont_close_stream, &frame[buff_index]);
-        if(!in_s.data){
-            printf("Stream closed.\n");
-            flag_exit = 1;
-            //exit(EXIT_FAILURE);
-            return 0;
-        }
+    env_var = getenv("OPENCV_QLEN");
 #endif
+
+    if(env_var != NULL){
+        env_var_int = atoi(env_var);
     }
-    image_waiting_time = frame[buff_index].frame_timestamp - fetch_start;
-
-    if(ondemand) transfer_delay = frame[buff_index].select - image_waiting_time;
-    else transfer_delay = .0; 
-
-    inter_frame_gap = GET_IFG(frame[buff_index].frame_sequence, frame_sequence_tmp);
-
-    if(cnt >= (cycle_offset - 5)){
-        d_fetch = gettime_after_boot() - fetch_start;
-        b_fetch = frame[buff_index].select;
-        e_fetch = d_fetch - b_fetch;
+    else {
+        printf("Using DEFAULT V4L Queue Length\n");
+        env_var_int = 4;
     }
 
-    if(cnt >= cycle_offset){
-        b_fetch_array[cnt-cycle_offset] = b_fetch;
-        if(ondemand) e_fetch_array[cnt-cycle_offset] = d_fetch - b_fetch;
-        else e_fetch_array[cnt-cycle_offset] = d_fetch;
-        d_fetch_array[cnt-cycle_offset] = d_fetch;
-        inter_frame_gap_array[cnt-cycle_offset] = inter_frame_gap;
-        transfer_delay_array[cnt-cycle_offset] = transfer_delay;
+    switch(env_var_int){
+        case 0 :
+            on_demand = 1;
+            size = 1;
+            break;
+        case 1:
+            on_demand = 0;
+            size = 1;
+            break;
+        case 2:
+            on_demand = 0;
+            size = 2;
+            break;
+        case 3:
+            on_demand = 0;
+            size = 3;
+            break;
+        case 4:
+            on_demand = 0;
+            size = 4;
+            break;
+        default :
+            on_demand = 0;
+            size = 4;
     }
 
-    return 0;
+    return on_demand;
 }
 
-void *detect_in_thread(void *ptr)
-{
-    infer_start = gettime_after_boot();
-
-    layer l = net.layers[net.n-1];
-#ifdef V4L2
-    float *X = frame[detect_index].resize_frame.data;
-#else
-    float *X = det_s.data;
-#endif
-    float *prediction = network_predict(net, X);
-
-    double e_i_cpu = gettime_after_boot();
-
-    memcpy(predictions[demo_index], prediction, l.outputs*sizeof(float));
-    mean_arrays(predictions, NFRAMES, l.outputs, avg);
-    l.output = avg;
-
-#ifndef V4L2
-    cv_images[demo_index] = det_img;
-    det_img = cv_images[(demo_index + NFRAMES / 2 + 1) % NFRAMES];
-#endif
-    demo_index = (demo_index + 1) % NFRAMES;
-
-#ifdef V4L2
-    dets = get_network_boxes(&net, net.w, net.h, demo_thresh, demo_thresh, 0, 1, &nboxes, 0); // resized
-#else
-    if (letter_box)
-        dets = get_network_boxes(&net, get_width_mat(in_img), get_height_mat(in_img), demo_thresh, demo_thresh, 0, 1, &nboxes, 1); // letter box
-    else
-        dets = get_network_boxes(&net, net.w, net.h, demo_thresh, demo_thresh, 0, 1, &nboxes, 0); // resized
-#endif
-
-    d_infer = gettime_after_boot() - infer_start;
-//    printf("detect_time : %f\n", detect_time);
-//    printf("detect in gpu : %f\n", detect_in_gpu);
-//    printf("detect in cpu : %f\n", gettime_after_boot() - i_cpu);
-
-    if(cnt >= cycle_offset)
-    {
-        e_infer_cpu_array[cnt - cycle_offset] = d_infer - e_infer_gpu;
-        e_infer_gpu_array[cnt - cycle_offset] = e_infer_gpu;
-        d_infer_array[cnt - cycle_offset] = d_infer;
-    }
-//    /* Change image */
-//    det_img = in_img;
-//    det_s = in_s;
-
-    return 0;
-}
-
-#ifdef V4L2
-void *display_in_thread(void *ptr)
-{
-    int c = show_image_cv(frame[display_index].frame, "Demo");
-
-    if (c == 27 || c == 1048603) // ESC - exit (OpenCV 2.x / 3.x)
-    {
-        flag_exit = 1;
-    }
-
-    return 0;
-}
-#endif
-
-double get_wall_time()
-{
-    struct timeval walltime;
-    if (gettimeofday(&walltime, NULL)) {
-        return 0;
-    }
-    return (double)walltime.tv_sec + (double)walltime.tv_usec * .000001;
-}
-
-void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
+void contention_free(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
         int frame_skip, char *prefix, char *out_filename, int mjpeg_port, int json_port, int dont_show, int ext_output, int letter_box_in, int time_limit_sec, char *http_post_host,
         int benchmark, int benchmark_layers, int offset)
 {
@@ -276,7 +167,6 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         getchar();
         exit(0);
     }
-
     flag_exit = 0;
 
     pthread_t fetch_thread;
@@ -285,6 +175,10 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
     ondemand = check_on_demand();
 
+    if(ondemand != 1) { 
+        fprintf(stderr, "ERROR : R-TOD needs on-demand capture.\n");
+        exit(0);
+    }
     //printf("ondemand : %d\n", ondemand);
 
 #ifdef V4L2
@@ -356,8 +250,8 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         ++count;
         {
             /* Image index */
-            display_index = (buff_index + 1) %3;
-            detect_index = (buff_index + 2) %3;
+            display_index = (buff_index + 2) %3;
+            detect_index = (buff_index) %3;
 
             const float nms = .45;    // 0.4F
             int local_nboxes = nboxes;
@@ -365,9 +259,6 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
             /* Fork fetch thread */
             if (!benchmark) if (pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
-
-            /* Fork inference thread */
-            if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
 
             /* display thread */
 
@@ -466,14 +357,18 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
             d_disp = display_end - display_start; 
 
-            /* Join inference thread */
-            pthread_join(detect_thread, 0);
-
             /* Join fetch thread */
             if (!benchmark) {
                 pthread_join(fetch_thread, 0);
                 free_image(det_s);
             }
+
+            /* Fork inference thread */
+            det_img = in_img;
+            det_s = in_s;
+
+            detect_in_thread(0);
+
             if (time_limit_sec > 0 && (get_time_point() - start_time_lim)/1000000 > time_limit_sec) {
                 printf(" start_time_lim = %f, get_time_point() = %f, time spent = %f \n", start_time_lim, get_time_point(), get_time_point() - start_time_lim);
                 break;
@@ -487,9 +382,6 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 #endif
                 show_img = det_img;
             }
-            det_img = in_img;
-            det_s = in_s;
-
             cycle_end = gettime_after_boot();
         }
         --delay;
@@ -535,6 +427,21 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             printf("latency: %f\n",e2e_delay[cnt-cycle_offset]);
             printf("cnt : %d\n",cnt);
         }
+#ifdef ZERO_SLACK
+        else if(cnt < (cycle_offset - 1))
+        {
+            printf("MIN : %f\n", MIN(s_min, (1000./fps)));
+            printf("e_fetch_max : %f\n", MAX(e_fetch_max, e_fetch));
+            printf("b_fetch_max : %f\n", MAX(b_fetch_max, b_fetch));
+            s_min = MIN(s_min, (1000./fps));
+            e_fetch_max = MAX(e_fetch_max, e_fetch);
+            b_fetch_max = MAX(b_fetch_max, b_fetch);
+        }
+        else if(cnt == (cycle_offset - 1)){
+            fetch_offset = (int)(s_min - e_fetch_max - b_fetch_max);
+            printf("fetch_offset : %d\n", fetch_offset);
+        }
+#endif
 
         /* Exit object detection cycle */
         if(cnt == ((obj_det_cycle_idx + cycle_offset)-1)){
@@ -655,7 +562,7 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     //cudaProfilerStop();
 }
 #else
-void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
+void contention_free(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
         int frame_skip, char *prefix, char *out_filename, int mjpeg_port, int json_port, int dont_show, int ext_output, int letter_box_in, int time_limit_sec, char *http_post_host,
         int benchmark, int benchmark_layers)
 {

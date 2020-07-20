@@ -1,0 +1,912 @@
+Getdevice count : 30648039.302798
+ CUDNN_HALF=1 
+Demo
+net.optimized_memory = 0 
+mini_batch = 1, batch = 1, time_steps = 1, train = 0 
+
+ reorg_old 
+
+ seen 32, trained: 32013 K-images (500 Kilo-batches_64) 
+demo start : 30648039.302254
+Webcam index: 0
+cam dev : /dev/video0
+Driver Caps:
+  Driver: "uvcvideo"
+  Card: "C922 Pro Stream Webcam"
+  Bus: "usb-3610000.xhci-4.1"
+  Version: 1.0
+  Capabilities: 84200001
+Camera Cropping:
+  Bounds: 640x480+0+0
+  Default: 640x480+0+0
+  Aspect: 1/1
+  FMT : CE Desc
+--------------------
+  YUYV:    YUYV 4:2:2
+  MJPG: C  Motion-JPEG
+Selected Camera Mode:
+  Width: 640
+  Height: 480
+  PixFmt: MJPG
+  Field: 1
+=============================
+Camera FPS : 30.000000
+=============================
+got data in buff 0, len=614400, flags=0x12001, seq=0, used=52950)
+lock finish : 0.642460
+lock finish : 5.517137
+================start================
+Fetch start : 30653913.383476
+Display start : 5874.114920
+Window 
+pull array start : 30653936.445059
+In pull array : 30653936.458404
+ASynch : 30653936.461476
+lock finish : 14.379508
+got data in buff 0, len=614400, flags=0x12001, seq=8, used=54808)
+Image time stamp : 30653937.554000
+ASynch end: 30654024.594062
+Synchronize : 30654024.617103
+Synchronize end: 30654024.699218
+detect_end : 30654030.216227
+lock finish : 109.883392
+Display end : 6014.228848
+display : 140.125417
+cycle end : 30654053.564127
+FPS : 7.126158
+================end===============
+================start================
+Fetch start : 30654053.662883
+person: 87%
+chair: 50%
+chair: 29%
+diningtable: 27%
+chair: 64%
+person: 29%
+Display start : 6032.802395
+pull array start : 30654073.183928
+In pull array : 30654073.197881
+ASynch : 30654073.220890
+Window 
+got data in buff 0, len=614400, flags=0x12001, seq=12, used=54907)
+lock finish : 10.886459
+Display end : 6049.520789
+display : 21.335780
+Image time stamp : 30654069.562000
+ASynch end: 30654163.006955
+Synchronize : 30654163.051117
+Synchronize end: 30654163.140081
+detect_end : 30654165.632062
+cycle end : 30654165.748067
+FPS : 8.913822
+================end===============
+================start================
+Fetch start : 30654175.049529
+person: 75%
+toothbrush: 42%
+chair: 35%
+chair: 41%
+chair: 70%
+person: 36%
+Display start : 6144.183003
+pull array start : 30654183.655537
+In pull array : 30654183.666321
+ASynch : 30654183.669202
+Window 
+lock finish : 8.328844
+lock finish : 0.013793
+lock finish : 0.076900
+Display end : 6161.520561
+display : 21.853851
+got data in buff 0, len=614400, flags=0x12001, seq=16, used=54941)
+Image time stamp : 30654201.545000
+ASynch end: 30654274.248166
+Synchronize : 30654274.295272
+Synchronize end: 30654274.380875
+detect_end : 30654277.078721
+cycle end : 30654277.164357
+FPS : 8.975441
+================end===============
+================start================
+Fetch start : 30654277.280586
+person: 78%
+toothbrush: 38%
+chair: 38%
+chair: 37%
+chair: 73%
+person: 39%
+Display start : 6255.212237
+pull array start : 30654294.855786
+In pull array : 30654294.870570
+ASynch : 30654294.873066
+Window 
+lock finish : 7.324000
+lock finish : 0.008161
+lock finish : 0.010944
+lock finish : 0.066627
+Display end : 6272.903506
+display : 21.684979
+got data in buff 0, len=614400, flags=0x12001, seq=19, used=54935)
+Image time stamp : 30654301.564000
+ASynch end: 30654383.248094
+Synchronize : 30654383.268191
+Synchronize end: 30654383.368804
+detect_end : 30654386.050937
+cycle end : 30654386.163742
+FPS : 9.174525
+================end===============
+================start================
+Fetch start : 30654386.293731
+person: 76%
+toothbrush: 43%
+chair: 43%
+chair: 25%
+chair: 39%
+chair: 74%
+diningtable: 26%
+person: 34%
+pull array start : 30654405.083384
+In pull array : 30654405.102681
+ASynch : 30654405.107225
+Display start : 6365.839629
+Window 
+got data in buff 0, len=614400, flags=0x12001, seq=22, used=54873)
+lock finish : 7.060852
+lock finish : 0.008288
+lock finish : 0.033026
+lock finish : 0.046242
+Display end : 6381.902410
+display : 20.614788
+Image time stamp : 30654401.568000
+ASynch end: 30654492.351516
+Synchronize : 30654492.406270
+Synchronize end: 30654492.488898
+detect_end : 30654495.626891
+cycle end : 30654495.785234
+FPS : 9.121675
+================end===============
+================start================
+Fetch start : 30654495.915351
+person: 76%
+toothbrush: 37%
+chair: 39%
+chair: 38%
+chair: 73%
+diningtable: 26%
+person: 35%
+pull array start : 30654512.104442
+In pull array : 30654512.136860
+ASynch : 30654512.140188
+Display start : 6473.242976
+got data in buff 0, len=614400, flags=0x12001, seq=25, used=54880)
+Window 
+lock finish : 7.278942
+lock finish : 0.009345
+lock finish : 0.033282
+lock finish : 0.052579
+Image time stamp : 30654501.559000
+Display end : 6489.269884
+display : 19.521621
+ASynch end: 30654597.620049
+Synchronize : 30654597.638866
+Synchronize end: 30654597.766136
+detect_end : 30654599.935606
+cycle end : 30654600.152672
+FPS : 9.582082
+================end===============
+================start================
+Fetch start : 30654600.273445
+got data in buff 0, len=614400, flags=0x12001, seq=28, used=54909)
+person: 75%
+toothbrush: 41%
+chair: 40%
+chair: 42%
+chair: 74%
+person: 33%
+Display start : 6577.189532
+Window 
+pull array start : 30654622.293255
+In pull array : 30654622.307688
+ASynch : 30654622.310152
+lock finish : 7.130648
+lock finish : 0.014561
+lock finish : 0.005857
+Image time stamp : 30654601.557000
+lock finish : 0.027905
+Display end : 6592.569371
+display : 18.520584
+ASynch end: 30654707.524466
+Synchronize : 30654707.539186
+Synchronize end: 30654707.571348
+detect_end : 30654709.217787
+cycle end : 30654709.328096
+FPS : 9.159098
+================end===============
+================start================
+Fetch start : 30654709.478503
+person: 74%
+toothbrush: 34%
+chair: 37%
+chair: 42%
+chair: 75%
+diningtable: 29%
+person: 36%
+pull array start : 30654725.660170
+In pull array : 30654725.680139
+ASynch : 30654725.683179
+Display start : 6686.817616
+Window 
+lock finish : 7.068853
+lock finish : 0.011584
+lock finish : 0.026721
+lock finish : 0.049058
+Display end : 6702.239505
+display : 18.922235
+got data in buff 0, len=614400, flags=0x12001, seq=32, used=54922)
+Image time stamp : 30654737.570000
+ASynch end: 30654810.938966
+Synchronize : 30654810.957975
+Synchronize end: 30654811.056955
+detect_end : 30654813.370464
+cycle end : 30654813.543624
+FPS : 9.596162
+================end===============
+================start================
+Fetch start : 30654813.661037
+person: 76%
+toothbrush: 33%
+chair: 38%
+chair: 44%
+chair: 75%
+diningtable: 28%
+person: 35%
+Display start : 6791.597392
+Window 
+pull array start : 30654836.718908
+In pull array : 30654836.734269
+ASynch : 30654836.736221
+lock finish : 7.503880
+lock finish : 0.034113
+lock finish : 0.006304
+got data in buff 0, len=614400, flags=0x12001, seq=35, used=54929)
+lock finish : 0.029090
+Display end : 6807.587658
+display : 19.809826
+Image time stamp : 30654837.584000
+ASynch end: 30654921.069984
+Synchronize : 30654921.085921
+Synchronize end: 30654921.151748
+detect_end : 30654922.779435
+cycle end : 30654922.885808
+FPS : 9.144913
+================end===============
+================start================
+Fetch start : 30654922.991892
+person: 75%
+toothbrush: 32%
+chair: 37%
+chair: 26%
+chair: 41%
+chair: 74%
+person: 32%
+pull array start : 30654939.101300
+In pull array : 30654939.114132
+ASynch : 30654939.120661
+Display start : 6900.957657
+Window 
+got data in buff 0, len=614400, flags=0x12001, seq=38, used=54914)
+lock finish : 7.022099
+lock finish : 0.008033
+lock finish : 0.005441
+lock finish : 0.054083
+Display end : 6916.502079
+display : 19.126756
+Image time stamp : 30654937.586000
+ASynch end: 30655022.581618
+Synchronize : 30655022.595506
+Synchronize end: 30655022.636180
+detect_end : 30655024.326526
+cycle end : 30655024.456740
+FPS : 9.845771
+================end===============
+================start================
+Fetch start : 30655024.594762
+person: 75%
+toothbrush: 27%
+chair: 35%
+chair: 41%
+chair: 70%
+person: 36%
+pull array start : 30655041.139132
+In pull array : 30655041.150461
+ASynch : 30655041.152285
+Display start : 7002.260961
+Window 
+got data in buff 0, len=614400, flags=0x12001, seq=41, used=54965)
+lock finish : 7.265566
+lock finish : 0.042818
+lock finish : 0.044098
+lock finish : 0.076995
+Display end : 7017.974799
+display : 19.084161
+Image time stamp : 30655037.581000
+ASynch end: 30655124.857636
+Synchronize : 30655124.875045
+Synchronize end: 30655125.062157
+detect_end : 30655126.603344
+cycle end : 30655126.712117
+FPS : 9.779076
+================end===============
+================start================
+Fetch start : 30655126.922174
+pull array start : 30655143.129026
+In pull array : 30655143.141635
+ASynch : 30655143.143619
+person: 74%
+chair: 38%
+chair: 41%got data in buff 0, len=614400, flags=0x12001, seq=44, used=54911)
+
+chair: 69%
+person: 35%
+Display start : 7107.697693
+Window 
+lock finish : 7.177433
+Image time stamp : 30655137.600000
+lock finish : 0.038433
+lock finish : 0.007809
+lock finish : 0.055874
+Display end : 7123.272133
+display : 18.621262
+ASynch end: 30655225.769019
+Synchronize : 30655225.785756
+Synchronize end: 30655225.886368
+detect_end : 30655228.187621
+cycle end : 30655228.270120
+FPS : 9.847266
+================end===============
+================start================
+Fetch start : 30655228.364940
+person: 74%
+toothbrush: 27%
+chair: 35%
+chair: 26%
+chair: 40%
+chair: 74%
+person: 33%
+pull array start : 30655244.424362
+In pull array : 30655244.479948
+ASynch : 30655244.483084
+got data in buff 0, len=614400, flags=0x12001, seq=47, used=54934)
+Display start : 7206.740226
+Window 
+lock finish : 7.543913
+Image time stamp : 30655237.589000
+lock finish : 0.014560
+lock finish : 0.009473
+lock finish : 0.042594
+Display end : 7223.168944
+display : 19.758143
+ASynch end: 30655327.683070
+Synchronize : 30655327.701855
+Synchronize end: 30655327.745856
+detect_end : 30655329.337318
+cycle end : 30655329.438826
+FPS : 9.883957
+================end===============
+================start================
+Fetch start : 30655329.569104
+got data in buff 0, len=614400, flags=0x12001, seq=50, used=54855)
+person: 73%
+chair: 32%
+chair: 39%
+chair: 73%
+person: 33%
+pull array start : 30655346.072097
+In pull array : 30655346.083137
+ASynch : 30655346.085889
+Display start : 7307.594775
+Window 
+lock finish : 7.051956
+lock finish : 0.019969
+Image time stamp : 30655337.594000
+lock finish : 0.008448
+lock finish : 0.032289
+Display end : 7323.195584
+display : 18.677935
+ASynch end: 30655429.681764
+Synchronize : 30655429.708261
+Synchronize end: 30655429.751911
+detect_end : 30655431.253129
+cycle end : 30655431.346381
+FPS : 9.812668
+================end===============
+================start================
+Fetch start : 30655431.465426
+got data in buff 0, len=614400, flags=0x12001, seq=53, used=54674)
+person: 73%
+chair: 35%
+chair: 44%
+chair: 72%
+person: 35%
+Display start : 7408.604978
+pull array start : 30655449.035825
+In pull array : 30655449.050546
+ASynch : 30655449.052306
+Window 
+lock finish : 7.242269
+Image time stamp : 30655437.593000
+lock finish : 0.010784
+lock finish : 0.009568
+lock finish : 0.057186
+Display end : 7424.096278
+display : 18.911418
+ASynch end: 30655531.188213
+Synchronize : 30655531.206870
+Synchronize end: 30655531.249912
+detect_end : 30655532.793307
+cycle end : 30655532.912320
+FPS : 9.845916
+================end===============
+================start================
+Fetch start : 30655533.053606
+got data in buff 0, len=614400, flags=0x12001, seq=56, used=54642)
+person: 73%
+toothbrush: 26%
+chair: 37%
+chair: 40%
+chair: 74%
+diningtable: 26%
+person: 36%
+pull array start : 30655549.947176
+In pull array : 30655549.967753
+ASynch : 30655549.969897
+Display start : 7511.294358
+Window 
+Image time stamp : 30655537.599000
+lock finish : 7.178617
+lock finish : 0.034177
+lock finish : 0.006176
+lock finish : 0.030209
+Display end : 7526.812732
+display : 19.361101
+ASynch end: 30655633.533578
+Synchronize : 30655633.551211
+Synchronize end: 30655633.619886
+detect_end : 30655635.136784
+cycle end : 30655635.234453
+FPS : 9.772986
+================end===============
+================start================
+Fetch start : 30655635.338105
+got data in buff 0, len=614400, flags=0x12001, seq=59, used=54945)
+person: 73%
+toothbrush: 33%
+chair: 42%
+chair: 26%
+chair: 37%
+chair: 77%
+person: 34%
+Display start : 7613.466340
+pull array start : 30655653.536660
+In pull array : 30655653.555701
+ASynch : 30655653.558005
+Window 
+Image time stamp : 30655637.603000
+lock finish : 7.399267
+lock finish : 0.008033
+lock finish : 0.008224
+lock finish : 0.055267
+Display end : 7629.416445
+display : 20.312247
+ASynch end: 30655734.822162
+Synchronize : 30655734.839634
+Synchronize end: 30655734.878964
+detect_end : 30655736.463609
+cycle end : 30655736.578590
+FPS : 9.867593
+================end===============
+================start================
+Fetch start : 30655736.698020
+got data in buff 0, len=614400, flags=0x12001, seq=62, used=54688)
+person: 73%
+toothbrush: 39%
+chair: 44%
+chair: 42%
+chair: 78%
+diningtable: 30%
+person: 38%
+Display start : 7713.958057
+pull array start : 30655753.451775
+In pull array : 30655753.464096
+ASynch : 30655753.466208
+Window 
+Image time stamp : 30655737.606000
+lock finish : 7.406915
+lock finish : 0.136870
+lock finish : 0.010880
+lock finish : 0.113957
+Display end : 7729.824094
+display : 19.353901
+ASynch end: 30655836.293889
+Synchronize : 30655836.310978
+Synchronize end: 30655836.351555
+detect_end : 30655837.890855
+cycle end : 30655837.985323
+FPS : 9.861070
+================end===============
+================start================
+Fetch start : 30655838.097200
+person: 31%
+person: 33%
+person: 73%
+toothbrush: 33%
+chair: 42%
+chair: 41%
+chair: 71%
+person: 35%
+pull array start : 30655854.419224
+In pull array : 30655854.428697
+ASynch : 30655854.448986
+Display start : 7816.155928
+Window 
+lock finish : 6.960656
+lock finish : 0.009345
+lock finish : 0.007297
+lock finish : 0.055971
+Display end : 7831.329838
+display : 18.675184
+got data in buff 0, len=614400, flags=0x12001, seq=66, used=54683)
+Image time stamp : 30655869.622000
+ASynch end: 30655938.313800
+Synchronize : 30655938.331753
+Synchronize end: 30655938.373131
+detect_end : 30655939.925743
+cycle end : 30655940.025619
+FPS : 9.800339
+================end===============
+================start================
+Fetch start : 30655940.175449
+person: 45%
+person: 75%
+toothbrush: 34%
+chair: 42%
+chair: 40%
+chair: 70%
+person: 38%
+Display start : 7918.001783
+pull array start : 30655957.626644
+In pull array : 30655957.636948
+ASynch : 30655957.638868
+Window 
+lock finish : 7.141720
+lock finish : 0.030625
+lock finish : 0.012384
+lock finish : 0.051202
+Display end : 7933.420793
+display : 19.373006
+got data in buff 0, len=614400, flags=0x12001, seq=69, used=54340)
+Image time stamp : 30655969.628000
+ASynch end: 30656040.437044
+Synchronize : 30656040.452724
+Synchronize end: 30656040.493398
+detect_end : 30656042.015897
+cycle end : 30656042.179136
+FPS : 9.788854
+================end===============
+================start================
+Fetch start : 30656042.361576
+pull array start : 30656058.693585
+In pull array : 30656058.704849
+ASynch : 30656058.706641
+person: 52%
+person: 77%
+toothbrush: 44%
+chair: 30%
+chair: 43%
+chair: 69%
+person: 37%
+Display start : 8021.626884
+Window 
+lock finish : 7.038419
+lock finish : 0.007744
+lock finish : 0.006624
+lock finish : 0.055426
+Display end : 8036.868574
+display : 18.640686
+got data in buff 0, len=614400, flags=0x12001, seq=72, used=54272)
+Image time stamp : 30656069.628000
+ASynch end: 30656142.579008
+Synchronize : 30656142.596192
+Synchronize end: 30656142.665091
+detect_end : 30656144.243016
+cycle end : 30656144.333196
+FPS : 9.789930
+================end===============
+================start================
+Fetch start : 30656144.449009
+person: 76%
+person: 79%
+toothbrush: 37%
+chair: 43%
+chair: 41%
+chair: 71%
+person: 34%
+Display start : 8121.960513
+pull array start : 30656161.306705
+In pull array : 30656161.313842
+ASynch : 30656161.315986
+Window 
+lock finish : 6.888172
+lock finish : 0.033633
+lock finish : 0.007872
+lock finish : 0.056226
+Display end : 8137.555050
+display : 19.191398
+got data in buff 0, len=614400, flags=0x12001, seq=75, used=54238)
+Image time stamp : 30656169.635000
+ASynch end: 30656245.381992
+Synchronize : 30656245.453932
+Synchronize end: 30656245.655156
+detect_end : 30656249.279219
+cycle end : 30656249.368566
+FPS : 9.520257
+================end===============
+================start================
+Fetch start : 30656249.473019
+person: 79%
+person: 79%
+chair: 51%
+chair: 41%
+chair: 70%
+person: 34%
+Display start : 8226.814244
+pull array start : 30656266.895956
+In pull array : 30656267.047098
+ASynch : 30656267.050683
+Window 
+lock finish : 6.952271
+lock finish : 0.012353
+lock finish : 0.005984
+lock finish : 0.060291
+Display end : 8242.253638
+display : 19.036607
+got data in buff 0, len=614400, flags=0x12001, seq=78, used=54657)
+Image time stamp : 30656269.649000
+ASynch end: 30656349.090745
+Synchronize : 30656349.108826
+Synchronize end: 30656349.152539
+detect_end : 30656350.646589
+cycle end : 30656350.746273
+FPS : 9.864195
+================end===============
+================start================
+Fetch start : 30656350.878855
+person: 84%
+person: 80%
+toothbrush: 26%
+chair: 60%
+chair: 41%
+chair: 71%
+diningtable: 28%
+person: 39%
+Display start : 8328.805385
+pull array start : 30656368.217916
+In pull array : 30656368.230973
+ASynch : 30656368.233021
+Window 
+lock finish : 6.966832
+lock finish : 0.011776
+lock finish : 0.007296
+got data in buff 0, len=614400, flags=0x12001, seq=81, used=55292)
+lock finish : 0.034306
+Display end : 8344.088132
+display : 19.489107
+Image time stamp : 30656369.657000
+ASynch end: 30656450.000303
+Synchronize : 30656450.014928
+Synchronize end: 30656450.054225
+detect_end : 30656451.573204
+cycle end : 30656451.694425
+FPS : 9.905538
+================end===============
+================start================
+Fetch start : 30656451.833503
+person: 79%
+person: 77%
+chair: 59%
+chair: 46%
+chair: 72%
+person: 41%
+Display start : 8429.698911
+pull array start : 30656469.087664
+In pull array : 30656469.098705
+ASynch : 30656469.100913
+Window 
+lock finish : 6.854187
+lock finish : 0.006881
+got data in buff 0, len=614400, flags=0x12001, seq=84, used=55422)
+lock finish : 0.007553
+lock finish : 0.052162
+Display end : 8444.988986
+display : 19.254473
+Image time stamp : 30656469.674000
+ASynch end: 30656551.008137
+Synchronize : 30656551.022154
+Synchronize end: 30656551.066476
+detect_end : 30656552.797464
+cycle end : 30656552.893532
+FPS : 9.881767
+================end===============
+================start================
+Fetch start : 30656553.024321
+person: 82%
+person: 76%
+chair: 60%
+chair: 49%
+chair: 72%
+diningtable: 27%
+person: 39%
+pull array start : 30656569.184995
+In pull array : 30656569.193956
+ASynch : 30656569.195684
+Display start : 8530.810910
+Window 
+lock finish : 6.924559
+got data in buff 0, len=614400, flags=0x12001, seq=87, used=55605)
+lock finish : 0.010208
+lock finish : 0.006976
+lock finish : 0.054850
+Display end : 8546.054903
+display : 18.616909
+Image time stamp : 30656569.659000
+ASynch end: 30656653.792113
+Synchronize : 30656653.809874
+Synchronize end: 30656653.856756
+detect_end : 30656655.382359
+cycle end : 30656655.504860
+FPS : 9.745941
+cnt : 25
+================end===============
+================start================
+Fetch start : 30656655.638690
+person: 81%
+person: 74%
+chair: 46%
+chair: 45%
+chair: 73%
+diningtable: 26%
+person: 40%
+pull array start : 30656671.801988
+In pull array : 30656671.820069
+ASynch : 30656671.823141
+Display start : 8632.889223
+Window 
+got data in buff 0, len=614400, flags=0x12001, seq=90, used=53095)
+lock finish : 7.329984
+lock finish : 0.011872
+lock finish : 0.011200
+lock finish : 0.061987
+Display end : 8648.592597
+display : 19.179910
+Image time stamp : 30656669.657000
+ASynch end: 30656755.893468
+Synchronize : 30656755.908028
+Synchronize end: 30656755.946174
+detect_end : 30656757.515650
+cycle end : 30656757.619687
+FPS : 9.789989
+cnt : 26
+================end===============
+================start================
+Fetch start : 30656757.768526
+person: 69%
+person: 81%
+chair: 53%
+chair: 51%
+chair: 75%
+diningtable: 26%
+person: 39%
+Display start : 8736.379086
+pull array start : 30656775.967880
+In pull array : 30656775.979657
+ASynch : 30656775.981609
+got data in buff 0, len=614400, flags=0x12001, seq=93, used=51165)
+Window 
+lock finish : 7.166009
+lock finish : 0.033729
+lock finish : 0.008544
+lock finish : 0.052930
+Display end : 8751.890227
+display : 19.726045
+Image time stamp : 30656769.661000
+ASynch end: 30656856.899638
+Synchronize : 30656856.913943
+Synchronize end: 30656856.984602
+detect_end : 30656858.502780
+cycle end : 30656858.615233
+FPS : 9.903821
+cnt : 27
+================end===============
+================start================
+Fetch start : 30656858.903534
+person: 83%
+person: 72%
+chair: 53%
+refrigerator: 26%
+chair: 44%
+chair: 74%
+diningtable: 28%
+person: 35%
+Display start : 8837.051578
+pull array start : 30656877.172683
+In pull array : 30656877.184204
+ASynch : 30656877.186124
+got data in buff 0, len=614400, flags=0x12001, seq=96, used=50313)
+Window 
+lock finish : 7.459174
+lock finish : 0.018817
+lock finish : 0.021441
+Image time stamp : 30656869.665000
+lock finish : 0.079587
+Display end : 8852.898989
+display : 20.156881
+ASynch end: 30656958.037526
+Synchronize : 30656958.086456
+Synchronize end: 30656958.127290
+detect_end : 30656960.758765
+cycle end : 30656960.908596
+FPS : 9.775863
+cnt : 28
+================end===============
+================start================
+Fetch start : 30656961.048538
+person: 79%
+person: 74%
+chair: 70%
+chair: 47%
+chair: 71%
+person: 34%
+Display start : 8938.319071
+got data in buff 0, len=614400, flags=0x12001, seq=99, used=51564)
+pull array start : 30656978.177382
+In pull array : 30656978.188678
+ASynch : 30656978.191142
+Window 
+lock finish : 7.091126
+lock finish : 0.010080
+Image time stamp : 30656969.668000
+lock finish : 0.006144
+lock finish : 0.032545
+Display end : 8953.960586
+display : 19.115074
+ASynch end: 30657061.083049
+Synchronize : 30657061.127595
+Synchronize end: 30657061.168333
+detect_end : 30657063.358989
+cycle end : 30657063.495698
+FPS : 9.748425
+cnt : 29
+============ Darknet data ===========
+Avg image waiting (ms): 12.385278
+Avg fetch (ms) : 23.065063
+Avg detect (ms) : 101.782716
+Avg display (ms) : 19.358964
+Avg slack (ms) : 56.332375
+Avg fps : 9.819232
+Avg latency (ms) : 220.325427
+Avg select (ms) : 21.217560
+Avg inter frame gap : 3.000000
+Avg cycle time (ms) : 101.841165
+Avg num object : 7.000000
+Avg Image transfer delay (ms) : 8.832282
+Avg draw bbox time (ms) : 3.763748
+=====================================
+input video stream closed. 
+j = 0
+NAFRAMES = 3
+j = 1
+NAFRAMES = 3
+j = 2
+NAFRAMES = 3
+4
+5
