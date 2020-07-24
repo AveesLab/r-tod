@@ -4,12 +4,12 @@
 #include "image.h"
 
 #if (defined ZERO_SLACK)
-#define cycle_offset 100
+#define CYCLE_OFFSET 1000
 #else
-#define cycle_offset 25
+#define CYCLE_OFFSET 25
 #endif
 
-#define obj_det_cycle_idx 100
+#define OBJ_DET_CYCLE_IDX 1000
 #define cycle 1
 #define QLEN 4
 #define NFRAMES 3
@@ -36,22 +36,22 @@ extern "C" {
 
 struct frame_data frame[3]; // v4l2 image data
 
-double e_fetch_array[obj_det_cycle_idx];
-double b_fetch_array[obj_det_cycle_idx];
-double d_fetch_array[obj_det_cycle_idx];
-double e_infer_cpu_array[obj_det_cycle_idx];
-double e_infer_gpu_array[obj_det_cycle_idx];
-double d_infer_array[obj_det_cycle_idx];
-double e_disp_array[obj_det_cycle_idx];
-double b_disp_array[obj_det_cycle_idx];
-double d_disp_array[obj_det_cycle_idx];
-double slack[obj_det_cycle_idx];
-double fps_array[obj_det_cycle_idx];
-double e2e_delay[obj_det_cycle_idx];
-int inter_frame_gap_array[obj_det_cycle_idx];
-double cycle_time_array[obj_det_cycle_idx];
-int num_object_array[obj_det_cycle_idx];
-double transfer_delay_array[obj_det_cycle_idx];
+double e_fetch_array[OBJ_DET_CYCLE_IDX];
+double b_fetch_array[OBJ_DET_CYCLE_IDX];
+double d_fetch_array[OBJ_DET_CYCLE_IDX];
+double e_infer_cpu_array[OBJ_DET_CYCLE_IDX];
+double e_infer_gpu_array[OBJ_DET_CYCLE_IDX];
+double d_infer_array[OBJ_DET_CYCLE_IDX];
+double e_disp_array[OBJ_DET_CYCLE_IDX];
+double b_disp_array[OBJ_DET_CYCLE_IDX];
+double d_disp_array[OBJ_DET_CYCLE_IDX];
+double slack[OBJ_DET_CYCLE_IDX];
+double fps_array[OBJ_DET_CYCLE_IDX];
+double e2e_delay[OBJ_DET_CYCLE_IDX];
+int inter_frame_gap_array[OBJ_DET_CYCLE_IDX];
+double cycle_time_array[OBJ_DET_CYCLE_IDX];
+int num_object_array[OBJ_DET_CYCLE_IDX];
+double transfer_delay_array[OBJ_DET_CYCLE_IDX];
 
 double e_fetch_sum;
 double b_fetch_sum;

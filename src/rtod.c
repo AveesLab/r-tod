@@ -60,7 +60,9 @@ extern double inter_frame_gap_sum = 0;
 extern double num_object_sum = 0;
 extern double trace_data_sum = 0;
 
+#ifndef ZERO_SLACK
 int contention_free = 1;
+#endif
 
 #ifdef ZERO_SLACK
 extern double s_min = 10000.;
@@ -169,7 +171,7 @@ void *rtod_fetch_thread(void *ptr)
 
     inter_frame_gap = GET_IFG(frame[buff_index].frame_sequence, frame_sequence_tmp);
 
-    if(cnt >= (cycle_offset - 5)){
+    if(cnt >= (CYCLE_OFFSET - 5)){
         d_fetch = end_fetch - start_fetch;
         b_fetch = frame[buff_index].select;
         e_fetch = d_fetch - b_fetch;
@@ -384,6 +386,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     double start_time = get_time_point();
     float avg_fps = 0;
     int frame_counter = 0;
+    int measure = 1;
 
     while(1){
         ++count;
@@ -412,7 +415,10 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
             printf("\033[2J");
             printf("\033[1;1H");
-            printf("FPS:%.1f \t AVG_FPS:%.1f\n", fps, avg_fps);
+#if (defined ZERO_SLACK)
+            if(measure) printf("Measuring...\n");
+#endif
+            printf("\nFPS:%.1f \t AVG_FPS:%.1f\n", fps, avg_fps);
             printf("Objects:\n\n");
 
             double start_disp = gettime_after_boot();
@@ -423,8 +429,6 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             }
 
 #ifdef V4L2
-            //if (!benchmark) draw_detections_v3(display, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
-
             if (!benchmark) draw_detections_v3(frame[display_index].frame, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
             free_detections(local_dets, local_nboxes);
 
@@ -476,6 +480,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
                     {
                         flag_exit = 1;
                     }
+
                 }
             }else{
                 char buff[256];
@@ -564,52 +569,54 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         slack_time = (MAX(d_infer, d_disp)) - (fetch_offset + d_fetch);
 
 #ifdef MEASUREMENT
-        if(cnt >= cycle_offset){
-            b_fetch_array[cnt-cycle_offset] = b_fetch;
-            e_fetch_array[cnt-cycle_offset] = d_fetch - b_fetch;
-            d_fetch_array[cnt-cycle_offset] = d_fetch;
-            inter_frame_gap_array[cnt-cycle_offset] = inter_frame_gap;
-            transfer_delay_array[cnt-cycle_offset] = transfer_delay;
+        if(cnt >= CYCLE_OFFSET){
+            b_fetch_array[cnt - CYCLE_OFFSET] = b_fetch;
+            e_fetch_array[cnt - CYCLE_OFFSET] = d_fetch - b_fetch;
+            d_fetch_array[cnt - CYCLE_OFFSET] = d_fetch;
+            inter_frame_gap_array[cnt - CYCLE_OFFSET] = inter_frame_gap;
+            transfer_delay_array[cnt - CYCLE_OFFSET] = transfer_delay;
 
-            e_infer_cpu_array[cnt - cycle_offset] = d_infer - e_infer_gpu;
-            e_infer_gpu_array[cnt - cycle_offset] = e_infer_gpu;
-            d_infer_array[cnt - cycle_offset] = d_infer;
+            e_infer_cpu_array[cnt - CYCLE_OFFSET] = d_infer - e_infer_gpu;
+            e_infer_gpu_array[cnt - CYCLE_OFFSET] = e_infer_gpu;
+            d_infer_array[cnt - CYCLE_OFFSET] = d_infer;
 
-            fps_array[cnt-cycle_offset] = fps;
-            cycle_time_array[cnt-cycle_offset] = 1000./fps;
-            e2e_delay[cnt-cycle_offset] = end_disp - frame[display_index].frame_timestamp;
-            e_disp_array[cnt-cycle_offset] = d_disp - b_disp;
-            b_disp_array[cnt-cycle_offset] = b_disp;
-            d_disp_array[cnt-cycle_offset] = d_disp;
-            slack[cnt - cycle_offset] = slack_time;
-            num_object_array[cnt - cycle_offset] = num_object;
+            fps_array[cnt - CYCLE_OFFSET] = fps;
+            cycle_time_array[cnt - CYCLE_OFFSET] = 1000./fps;
+            e2e_delay[cnt - CYCLE_OFFSET] = end_disp - frame[display_index].frame_timestamp;
+            e_disp_array[cnt - CYCLE_OFFSET] = d_disp - b_disp;
+            b_disp_array[cnt - CYCLE_OFFSET] = b_disp;
+            d_disp_array[cnt - CYCLE_OFFSET] = d_disp;
+            slack[cnt - CYCLE_OFFSET] = slack_time;
+            num_object_array[cnt - CYCLE_OFFSET] = num_object;
 
             //printf("num_object : %d\n", num_object);
-            //printf("slack: %f\n",slack[cnt-cycle_offset]);
-            printf("latency: %f\n",e2e_delay[cnt-cycle_offset]);
+            //printf("slack: %f\n",slack[cnt-CYCLE_OFFSET]);
+            printf("latency: %f\n",e2e_delay[cnt - CYCLE_OFFSET]);
             printf("cnt : %d\n",cnt);
         }
 #endif
 
 #ifdef ZERO_SLACK
-        else if(cnt < (cycle_offset - 1))
-        {
-            printf("MIN : %f\n", MIN(s_min, (1000./fps)));
-            printf("e_fetch_max : %f\n", MAX(e_fetch_max, e_fetch));
-            printf("b_fetch_max : %f\n", MAX(b_fetch_max, b_fetch));
+        if(cnt < (CYCLE_OFFSET - 1)){
+            printf("\nMIN cycle time : %f\n", MIN(s_min, (1000./fps)));
+            printf("MAX e_fetch : %f\n", MAX(e_fetch_max, e_fetch));
+            printf("MAX b_fetch : %f\n", MAX(b_fetch_max, b_fetch));
+
             s_min = MIN(s_min, (1000./fps));
             e_fetch_max = MAX(e_fetch_max, e_fetch);
             b_fetch_max = MAX(b_fetch_max, b_fetch);
         }
-        else if(cnt == (cycle_offset - 1)){
+        else if(cnt == (CYCLE_OFFSET - 1)){
             fetch_offset = (int)(s_min - e_fetch_max - b_fetch_max);
             printf("fetch_offset : %d\n", fetch_offset);
+
+            measure = 0;
         }
 #endif
 
 #ifdef MEASUREMENT
         /* Exit object detection cycle */
-        if(cnt == ((obj_det_cycle_idx + cycle_offset)-1)){
+        if(cnt == ((OBJ_DET_CYCLE_IDX + CYCLE_OFFSET)-1)){
             int exist=0;
             FILE *fp;
             char file_path[100] = "";
@@ -638,7 +645,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
                     "e_infer", "b_infer", "d_infer", "e_disp", "b_disp", "d_disp",
                     "slack", "e2e_delay", "fps", "c_sys", "IFG", "n_obj");
 
-            for(int i=0;i<obj_det_cycle_idx;i++){
+            for(int i=0;i<OBJ_DET_CYCLE_IDX;i++){
                 e_fetch_sum += e_fetch_array[i];
                 b_fetch_sum += b_fetch_array[i];
                 d_fetch_sum += d_fetch_array[i];
@@ -664,8 +671,8 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             /* exit loop */
             break;
         }
-        cnt++;
 #endif
+        if(cnt != ((OBJ_DET_CYCLE_IDX + CYCLE_OFFSET)-1)) cnt++;
         buff_index = (buff_index + 1) % 3;
     }
     cnt = 0;
@@ -673,20 +680,20 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 #ifdef MEASUREMENT
     /* Average data */
     printf("============ Darknet data ===========\n");
-    printf("Avg fetch execution time (ms) : %0.2f\n", e_fetch_sum / obj_det_cycle_idx);
-    printf("Avg fetch blocking time (ms) : %0.2f\n", b_fetch_sum / obj_det_cycle_idx);
-    printf("Avg fetch delay (ms) : %0.2f\n", d_fetch_sum / obj_det_cycle_idx);
-    printf("Avg infer execution on cpu (ms) : %0.2f\n", e_infer_cpu_sum / obj_det_cycle_idx);
-    printf("Avg infer execution on gpu (ms) : %0.2f\n", e_infer_gpu_sum / obj_det_cycle_idx);
-    printf("Avg infer delay (ms) : %0.2f\n", d_infer_sum / obj_det_cycle_idx);
-    printf("Avg disp execution time (ms) : %0.2f\n", e_disp_sum / obj_det_cycle_idx);
-    printf("Avg disp blocking time (ms) : %0.2f\n", b_disp_sum / obj_det_cycle_idx);
-    printf("Avg disp delay (ms) : %0.2f\n", d_disp_sum / obj_det_cycle_idx);
-    printf("Avg salck (ms) : %0.2f\n", slack_sum / obj_det_cycle_idx);
-    printf("Avg E2E delay (ms) : %0.2f\n", e2e_delay_sum / obj_det_cycle_idx);
-    printf("Avg cycle time (ms) : %0.2f\n", cycle_time_sum / obj_det_cycle_idx);
-    printf("Avg inter frame gap : %0.2f\n", inter_frame_gap_sum / obj_det_cycle_idx);
-    printf("Avg number of object : %0.2f\n", num_object_sum / obj_det_cycle_idx);
+    printf("Avg fetch execution time (ms) : %0.2f\n", e_fetch_sum / OBJ_DET_CYCLE_IDX);
+    printf("Avg fetch blocking time (ms) : %0.2f\n", b_fetch_sum / OBJ_DET_CYCLE_IDX);
+    printf("Avg fetch delay (ms) : %0.2f\n", d_fetch_sum / OBJ_DET_CYCLE_IDX);
+    printf("Avg infer execution on cpu (ms) : %0.2f\n", e_infer_cpu_sum / OBJ_DET_CYCLE_IDX);
+    printf("Avg infer execution on gpu (ms) : %0.2f\n", e_infer_gpu_sum / OBJ_DET_CYCLE_IDX);
+    printf("Avg infer delay (ms) : %0.2f\n", d_infer_sum / OBJ_DET_CYCLE_IDX);
+    printf("Avg disp execution time (ms) : %0.2f\n", e_disp_sum / OBJ_DET_CYCLE_IDX);
+    printf("Avg disp blocking time (ms) : %0.2f\n", b_disp_sum / OBJ_DET_CYCLE_IDX);
+    printf("Avg disp delay (ms) : %0.2f\n", d_disp_sum / OBJ_DET_CYCLE_IDX);
+    printf("Avg salck (ms) : %0.2f\n", slack_sum / OBJ_DET_CYCLE_IDX);
+    printf("Avg E2E delay (ms) : %0.2f\n", e2e_delay_sum / OBJ_DET_CYCLE_IDX);
+    printf("Avg cycle time (ms) : %0.2f\n", cycle_time_sum / OBJ_DET_CYCLE_IDX);
+    printf("Avg inter frame gap : %0.2f\n", inter_frame_gap_sum / OBJ_DET_CYCLE_IDX);
+    printf("Avg number of object : %0.2f\n", num_object_sum / OBJ_DET_CYCLE_IDX);
     printf("=====================================\n");
 #endif
 
