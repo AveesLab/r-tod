@@ -25,7 +25,7 @@ $ ./darknet detector demo cfg/coco.data cfg weights
   weights: path to weights file
 ```
 ### On-demand capture & Original pipeline
-* See On-demand capture
+* See How to set _On-demand capture_
 ```
 $ ./darknet detector demo cfg/coco.data cfg weights
       cfg : path to yolo network configure file
