@@ -7,7 +7,6 @@ More details: http://pjreddie.com/darknet/yolo/
 # R-TOD: Real-Time Object Detector
 
 ### Compile using 'Make' ###
-* 
 * `V4L2=1` build with V4L2 - Fetch image with On-demand capture using V4L2 ioctl without OpenCV library
 * `ZERO_SLACK=1` build with ZERO_SLACK - Zero-slack pipeline (0 means Contention-free pipeline)
 * `MEASUREMENT=1` build with MEASUREMENT - Measure delay (capture ~ display) and log to csv file (You can define iteration in src/rtod.h OBJ_DET_CYCLE_IDX)
