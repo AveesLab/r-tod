@@ -1028,24 +1028,6 @@ struct frame_data {
     double select;
 };
 
-#ifndef V4L2_H
-#define V4L2_H
-
-static int xioctl(int fd, int request, void *arg);
-int print_caps(int fd, int w, int h);
-int init_mmap(int fd, int q_len);
-//image capture_image(double *frame_timestamp, int buff_index, int *frame_sequence, double *p_image, int *len);
-//image capture_image(struct frame_data *f, mat_cv** in_img, int w, int h, int c);
-image capture_image(struct frame_data *f);
-//void** capture_image(struct frame_data *f);
-int set_framerate(int fd, int fps);
-
-int open_device(char *cam_dev, int fps, int w, int h);
-
-#endif
-
-void vector_add_gpu();
-
 #ifdef __cplusplus
 }
 #endif  // __cplusplus
