@@ -32,17 +32,16 @@ $ ./darknet detector demo cfg/coco.data cfg weights
    weights: path to weights file
 ```
 ### Zero-slack pipeline
-* Case 1: Build with V4L2=0, see On-demand capture with OpenCV.
-* Case 2: Build with V4L2=1, no setup required.
-* Compile with ZERO_SLACK=1
+* See [How to set On-demand capture](#how-to-set-on--demand-capture)
+* Compile with `ZERO_SLACK=1`
 ```
 $ ./darknet detector rtod cfg/coco.data cfg weights
       cfg : path to yolo network configure file
       weights: path to weights file
 ```
 ### Contention-free pipeline
-* Set On-demand capture
-* Compile with ZERO_SLACK=0
+* See [How to set On-demand capture](#how-to-set-on--demand-capture)
+* Compile with `ZERO_SLACK=0`
 ```
 $ ./darknet detector rtod cfg/coco.data cfg weights
       cfg : path to yolo network configure file
