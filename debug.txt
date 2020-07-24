@@ -1,0 +1,4 @@
+ CUDNN_HALF=1 
+Demo
+net.optimized_memory = 0 
+mini_batch = 1, batch = 1, time_steps = 1, train = 0 
