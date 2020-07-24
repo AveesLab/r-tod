@@ -10,7 +10,7 @@ More details
 ### Compile using 'Make' ###
 * `V4L2=1`: Fetch image with On-demand capture using V4L2 ioctl without OpenCV library (0: Fetch image using OpenCV)
 * `ZERO_SLACK=1`: Use Zero-slack pipeline (0 means Contention-free pipeline)
-* `MEASUREMENT=1`: Measure delay (capture ~ display) and log to csv file (See [measurement](#measurement-setup)
+* `MEASUREMENT=1`: Measure delay (capture ~ display) and log to csv file (See [Measurement setup](#measurement-setup))
 
 ### How to set On-demand capture
 * Build `V4L2=0`: See https://github.com/wonseok-Jang/OpenCV-3.3.1
