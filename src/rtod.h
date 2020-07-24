@@ -9,8 +9,11 @@
 #define CYCLE_OFFSET 25
 #endif
 
+/* Measurement */
+#define MEASUREMENT_PATH "measure"
+#define MEASUREMENT_FILE "/measure.csv"
 #define OBJ_DET_CYCLE_IDX 1000
-#define cycle 1
+
 #define QLEN 4
 #define NFRAMES 3
 
@@ -20,9 +23,6 @@
 #define GET_IFG(x,y) ((x) - (y)); \
     (y) = (x);
 
-/* Measurement */
-#define MEASUREMENT_PATH "measure"
-#define MEASUREMENT_FILE "/measure.csv"
 
 #ifdef __cplusplus
 extern "C" {
