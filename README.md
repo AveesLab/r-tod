@@ -24,14 +24,14 @@ $ ./darknet detector demo cfg/coco.data cfg weights
      cfg : path to yolo network configure file
   weights: path to weights file
 ```
-### On-demand capture & Original pipeline
+#### On-demand capture & Original pipeline
 * See [How to set On-demand capture](#how-to-set-on--demand-capture)
 ```
 $ ./darknet detector demo cfg/coco.data cfg weights
       cfg : path to yolo network configure file
    weights: path to weights file
 ```
-### Zero-slack pipeline
+#### Zero-slack pipeline
 * See [How to set On-demand capture](#how-to-set-on--demand-capture)
 * Compile with `ZERO_SLACK=1`
 ```
@@ -39,7 +39,7 @@ $ ./darknet detector rtod cfg/coco.data cfg weights
       cfg : path to yolo network configure file
       weights: path to weights file
 ```
-### Contention-free pipeline
+#### Contention-free pipeline
 * See [How to set On-demand capture](#how-to-set-on--demand-capture)
 * Compile with `ZERO_SLACK=0`
 ```
@@ -48,4 +48,11 @@ $ ./darknet detector rtod cfg/coco.data cfg weights
    weights: path to weights file
 ```
 
-## Measurement setup ##
+### Measurement setup ###
+* In `src/rtod.h`, you can modify measurement setup.
+```
+/* Measurement */
+#define MEASUREMENT_PATH               // Directory of measurement file
+#define MEASUREMENT_FILE               // Measurement file name
+#define MEASUREMENT_OBJ_DET_CYCLE_IDX  // Count of measurement
+```
