@@ -8,17 +8,17 @@ More details
 # R-TOD: Real-Time Object Detector
 
 ### Compile using 'Make' ###
-* `V4L2=1` build with V4L2 - Fetch image with On-demand capture using V4L2 ioctl without OpenCV library
-* `ZERO_SLACK=1` build with ZERO_SLACK - Zero-slack pipeline (0 means Contention-free pipeline)
-* `MEASUREMENT=1` build with MEASUREMENT - Measure delay (capture ~ display) and log to csv file (You can define iteration in src/rtod.h OBJ_DET_CYCLE_IDX)
+* `V4L2=1`: Fetch image with On-demand capture using V4L2 ioctl without OpenCV library (0: Fetch image using OpenCV)
+* `ZERO_SLACK=1`: Use Zero-slack pipeline (0 means Contention-free pipeline)
+* `MEASUREMENT=1`: Measure delay (capture ~ display) and log to csv file (See [measurement](#measurement-setup)
 
 ### How to set On-demand capture
 * Build `V4L2=0`: See https://github.com/wonseok-Jang/OpenCV-3.3.1
 * Build `V4L2=1`: No setup required.
 
-## Usage ###
+### Usage ###
 
-### Original capture & Original pipeline
+#### Original capture & Original pipeline
 ```
 $ ./darknet detector demo cfg/coco.data cfg weights 
      cfg : path to yolo network configure file
@@ -47,3 +47,5 @@ $ ./darknet detector rtod cfg/coco.data cfg weights
       cfg : path to yolo network configure file
    weights: path to weights file
 ```
+
+## Measurement setup ##
