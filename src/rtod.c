@@ -174,15 +174,6 @@ void *rtod_fetch_thread(void *ptr)
         b_fetch = frame[buff_index].select;
         e_fetch = d_fetch - b_fetch;
     }
-
-//    if(cnt >= cycle_offset){
-//        b_fetch_array[cnt-cycle_offset] = b_fetch;
-//        e_fetch_array[cnt-cycle_offset] = d_fetch - b_fetch;
-//        d_fetch_array[cnt-cycle_offset] = d_fetch;
-//        inter_frame_gap_array[cnt-cycle_offset] = inter_frame_gap;
-//        transfer_delay_array[cnt-cycle_offset] = transfer_delay;
-//    }
-
     return 0;
 }
 
@@ -221,13 +212,6 @@ void *rtod_inference_thread(void *ptr)
     end_infer = gettime_after_boot();
 
     d_infer = end_infer - start_infer;
-
-//    if(cnt >= cycle_offset)
-//    {
-//        e_infer_cpu_array[cnt - cycle_offset] = d_infer - e_infer_gpu;
-//        e_infer_gpu_array[cnt - cycle_offset] = e_infer_gpu;
-//        d_infer_array[cnt - cycle_offset] = d_infer;
-//    }
 
     return 0;
 }
@@ -328,7 +312,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         fprintf(stderr, "ERROR : R-TOD needs on-demand capture.\n");
         exit(0);
     }
-    
+
     printf("Object detector information:\n"
             "  Capture: \"%s\"\n"
             "  Pipeline architecture: \"%s\"\n",
@@ -474,7 +458,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
             free_detections(local_dets, local_nboxes);
 
-                        if(!prefix){
+            if(!prefix){
                 if (!dont_show) {
                     show_image_mat(show_img, "Demo");
 
