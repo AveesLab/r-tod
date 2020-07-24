@@ -17,12 +17,12 @@ See https://github.com/wonseok-Jang/OpenCV-3.3.1
 
 ## Usage ###
 
-'# Original capture & Original pipeline'
+### Original capture & Original pipeline
 * $ ./darknet detector demo cfg/coco.data cfg weights
      cfg : path to yolo network configure file
   weights: path to weights file
   
-# On-demand capture & Original pipeline
+### On-demand capture & Original pipeline
 * Set On-demand capture
    case 1: build with V4L2=0
          - See Image fetch with OpenCV
@@ -32,14 +32,14 @@ See https://github.com/wonseok-Jang/OpenCV-3.3.1
       cfg : path to yolo network configure file
    weights: path to weights file
   
-# Zero-slack pipeline
+### Zero-slack pipeline
 * Set On-demand capture
 * Compile with ZERO_SLACK=1
 * ./darknet detector rtod cfg/coco.data cfg weights
       cfg : path to yolo network configure file
    weights: path to weights file
 
-# Contention-free pipeline
+### Contention-free pipeline
 * Set On-demand capture
 * Compile with ZERO_SLACK=0
 * ./darknet detector rtod cfg/coco.data cfg weights
