@@ -17,7 +17,7 @@ See https://github.com/wonseok-Jang/OpenCV-3.3.1
 
 ## Usage ###
 
-# 'Original capture & Original pipeline'
+'# Original capture & Original pipeline'
 * $ ./darknet detector demo cfg/coco.data cfg weights
      cfg : path to yolo network configure file
   weights: path to weights file
