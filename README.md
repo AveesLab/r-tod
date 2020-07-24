@@ -24,7 +24,6 @@ $ ./darknet detector demo cfg/coco.data cfg weights
   weights: path to weights file
 ```
 ### On-demand capture & Original pipeline
-Set On-demand capture
 * Build with V4L2=0, See On-demand capture with OpenCV.
 * Build with V4L2=1, no setup required.
 ```
@@ -33,7 +32,8 @@ $ ./darknet detector demo cfg/coco.data cfg weights
    weights: path to weights file
 ```
 ### Zero-slack pipeline
-* Set On-demand capture
+* Case 1: Build with V4L2=0, see On-demand capture with OpenCV.
+* Case 2: Build with V4L2=1, no setup required.
 * Compile with ZERO_SLACK=1
 ```
 $ ./darknet detector rtod cfg/coco.data cfg weights
