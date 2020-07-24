@@ -12,7 +12,7 @@ More details
 * `ZERO_SLACK=1` build with ZERO_SLACK - Zero-slack pipeline (0 means Contention-free pipeline)
 * `MEASUREMENT=1` build with MEASUREMENT - Measure delay (capture ~ display) and log to csv file (You can define iteration in src/rtod.h OBJ_DET_CYCLE_IDX)
 
-### How to set _On-demand capture_
+### How to set On-demand capture
 * Build `V4L2=0`: See https://github.com/wonseok-Jang/OpenCV-3.3.1
 * Build `V4L2=1`: No setup required.
 
@@ -25,7 +25,7 @@ $ ./darknet detector demo cfg/coco.data cfg weights
   weights: path to weights file
 ```
 ### On-demand capture & Original pipeline
-* See [How to set _On-demand capture_](#how-to-set-on-demand capture)
+* See [How to set On-demand capture](#how-to-set-on--demand-capture)
 ```
 $ ./darknet detector demo cfg/coco.data cfg weights
       cfg : path to yolo network configure file
