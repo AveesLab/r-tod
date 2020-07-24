@@ -37,7 +37,7 @@ See https://github.com/wonseok-Jang/OpenCV-3.3.1
 * Compile with ZERO_SLACK=1
 * ./darknet detector rtod cfg/coco.data cfg weights
       cfg : path to yolo network configure file
-   weights: path to weights file
+      weights: path to weights file
 
 ### Contention-free pipeline
 * Set On-demand capture
