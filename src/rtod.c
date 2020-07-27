@@ -308,12 +308,14 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     pthread_t fetch_thread;
     pthread_t inference_thread;
 
+#ifndef V4L2
     ondemand = check_on_demand();
 
     if(ondemand != 1) { 
         fprintf(stderr, "ERROR : R-TOD needs on-demand capture.\n");
         exit(0);
     }
+#endif
 
     printf("Object detector information:\n"
             "  Capture: \"%s\"\n"
