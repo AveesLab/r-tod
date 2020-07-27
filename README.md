@@ -28,30 +28,27 @@ More details
 
 ### Usage ###
 
-#### Original capture & Original pipeline
+#### Original pipeline
+You can choose two capture method (Orignal capture & On-demand capture).
+* See https://github.com/wonseok-Jang/OpenCV-3.3.1 in "Image capture".
+* **Original capture**: Orignal darknet with nothing modified.
+* **On-demand capture**: Remove unnecessary image queue.
 ```
 $ ./darknet detector demo cfg/coco.data cfg weights 
      cfg : path to yolo network configure file
   weights: path to weights file
 ```
-#### On-demand capture & Original pipeline
-* See [How to set On-demand capture](#how-to-set-on--demand-capture)
-```
-$ ./darknet detector demo cfg/coco.data cfg weights
-      cfg : path to yolo network configure file
-   weights: path to weights file
-```
 #### Zero-slack pipeline
-* See [How to set On-demand capture](#how-to-set-on--demand-capture)
-* Compile with `ZERO_SLACK=1`
+* See [How to set On-demand capture](#how-to-set-on--demand-capture).
+* Compile with `ZERO_SLACK=1`.
 ```
 $ ./darknet detector rtod cfg/coco.data cfg weights
       cfg : path to yolo network configure file
       weights: path to weights file
 ```
 #### Contention-free pipeline
-* See [How to set On-demand capture](#how-to-set-on--demand-capture)
-* Compile with `ZERO_SLACK=0`
+* See [How to set On-demand capture](#how-to-set-on--demand-capture).
+* Compile with `ZERO_SLACK=0`.
 ```
 $ ./darknet detector rtod cfg/coco.data cfg weights
       cfg : path to yolo network configure file
