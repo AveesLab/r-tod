@@ -283,13 +283,6 @@ extern "C" {
 
         double select_start = gettime_after_boot();
 
-#ifndef BUSY_WAITING
-        if(-1 == select(fd+1, &fds, NULL, NULL, &tv))
-        {
-            perror("Waiting for Frame");
-        }
-#endif
-
         f->select = gettime_after_boot() - select_start;
 
         if(-1 == xioctl(fd, VIDIOC_DQBUF, &buf))
