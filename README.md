@@ -30,7 +30,7 @@ More details
 
 #### Original pipeline
 You can choose two capture method (Orignal capture & On-demand capture).
-* See "Image capture" in https://github.com/wonseok-Jang/OpenCV-3.3.1.
+* See **Image capture** in https://github.com/wonseok-Jang/OpenCV-3.3.1.
 * **Original capture**: Orignal darknet with nothing modified.
 * **On-demand capture**: Remove unnecessary image queue.
 ```
