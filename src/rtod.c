@@ -278,7 +278,6 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         if(open_device(cam_dev, frames, w, h) < 0)
         {
             error("Couldn't connect to webcam.\n");
-
         }
 #else
         cap = get_capture_webcam(cam_index);
@@ -666,7 +665,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
                 fprintf(fp, "%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%d,%d\n", e_fetch_array[i], b_fetch_array[i],d_fetch_array[i], 
                         e_infer_cpu_array[i], e_infer_gpu_array[i], d_infer_array[i], e_disp_array[i], b_disp_array[i], d_disp_array[i], 
-                        e2e_delay[i], slack[i], fps_array[i], cycle_time_array[i], inter_frame_gap_array[i], num_object_array[i]);
+                         slack[i], e2e_delay[i], fps_array[i], cycle_time_array[i], inter_frame_gap_array[i], num_object_array[i]);
             }
             fclose(fp);
 
@@ -681,7 +680,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
 #ifdef MEASUREMENT
     /* Average data */
-    printf("============ Darknet data ===========\n");
+    printf("============ Darknet data ============\n");
     printf("Avg fetch execution time (ms) : %0.2f\n", e_fetch_sum / OBJ_DET_CYCLE_IDX);
     printf("Avg fetch blocking time (ms) : %0.2f\n", b_fetch_sum / OBJ_DET_CYCLE_IDX);
     printf("Avg fetch delay (ms) : %0.2f\n", d_fetch_sum / OBJ_DET_CYCLE_IDX);
