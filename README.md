@@ -23,7 +23,7 @@ More details
 /* Measurement */
 #define MEASUREMENT_PATH               // Directory of measurement file
 #define MEASUREMENT_FILE               // Measurement file name
-#define MEASUREMENT_OBJ_DET_CYCLE_IDX  // Count of measurement
+#define OBJ_DET_CYCLE_IDX  // Count of measurement
 ```
 
 ### Usage ###
