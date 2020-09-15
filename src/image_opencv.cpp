@@ -454,9 +454,9 @@ extern "C" {
             else if (mat.channels() == 4) cv::cvtColor(mat, mat, cv::COLOR_RGBA2BGR);
             cv::namedWindow(name, cv::WINDOW_NORMAL);
             cv::imshow(name, mat);
-            waitkey_start = gettime_after_boot();
+            waitkey_start = get_time_in_ms();
             int c = cv::waitKey(1);
-            b_disp = gettime_after_boot() - waitkey_start;
+            b_disp = get_time_in_ms() - waitkey_start;
 
             free_image(copy);
 

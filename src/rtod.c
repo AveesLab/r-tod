@@ -72,7 +72,7 @@ extern double b_fetch_max = 0;
 int contention_free = 0;
 #endif
 
-double gettime_after_boot()
+double get_time_in_ms()
 {
     struct timespec time_after_boot;
     clock_gettime(CLOCK_MONOTONIC,&time_after_boot);
@@ -133,7 +133,7 @@ void *rtod_fetch_thread(void *ptr)
 {
     usleep(fetch_offset * 1000);
 
-    start_fetch = gettime_after_boot();
+    start_fetch = get_time_in_ms();
 
     int dont_close_stream = 0;    // set 1 if your IP-camera periodically turns off and turns on video-stream
     if(letter_box)
@@ -162,7 +162,7 @@ void *rtod_fetch_thread(void *ptr)
         }
 #endif
     }
-    end_fetch = gettime_after_boot();
+    end_fetch = get_time_in_ms();
 
     image_waiting_time = frame[buff_index].frame_timestamp - start_fetch;
 
@@ -181,7 +181,7 @@ void *rtod_fetch_thread(void *ptr)
 
 void *rtod_inference_thread(void *ptr)
 {
-    start_infer = gettime_after_boot();
+    start_infer = get_time_in_ms();
 
     layer l = net.layers[net.n-1];
 #ifdef V4L2
@@ -191,7 +191,7 @@ void *rtod_inference_thread(void *ptr)
 #endif
     float *prediction = network_predict(net, X);
 
-    double e_i_cpu = gettime_after_boot();
+    double e_i_cpu = get_time_in_ms();
 
     memcpy(predictions[demo_index], prediction, l.outputs*sizeof(float));
     mean_arrays(predictions, NFRAMES, l.outputs, avg);
@@ -211,7 +211,7 @@ void *rtod_inference_thread(void *ptr)
     else
         dets = get_network_boxes(&net, net.w, net.h, demo_thresh, demo_thresh, 0, 1, &nboxes, 0); // resized
 #endif
-    end_infer = gettime_after_boot();
+    end_infer = get_time_in_ms();
 
     d_infer = end_infer - start_infer;
 
@@ -383,7 +383,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     int send_http_post_once = 0;
     const double start_time_lim = get_time_point();
     double before = get_time_point();
-    double before_1 = gettime_after_boot();
+    double before_1 = get_time_in_ms();
     double start_time = get_time_point();
     float avg_fps = 0;
     int frame_counter = 0;
@@ -422,7 +422,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             printf("\nFPS:%.1f \t AVG_FPS:%.1f\n", fps, avg_fps);
             printf("Objects:\n\n");
 
-            double start_disp = gettime_after_boot();
+            double start_disp = get_time_in_ms();
 
             if (nms) {
                 if (l.nms_kind == DEFAULT_NMS) do_nms_sort(local_dets, local_nboxes, l.classes, nms);
@@ -433,7 +433,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             if (!benchmark) draw_detections_v3(frame[display_index].frame, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
             free_detections(local_dets, local_nboxes);
 
-            draw_bbox_time = gettime_after_boot() - start_disp;
+            draw_bbox_time = get_time_in_ms() - start_disp;
 
             /* Image display */
             rtod_display_thread(0);
@@ -459,7 +459,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
             if (!benchmark) draw_detections_cv_v3(show_img, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
 
-            draw_bbox_time = gettime_after_boot() - start_disp;
+            draw_bbox_time = get_time_in_ms() - start_disp;
 
             free_detections(local_dets, local_nboxes);
 
@@ -467,9 +467,9 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
                 if (!dont_show) {
                     show_image_mat(show_img, "Demo");
 
-                    waitkey_start = gettime_after_boot();
+                    waitkey_start = get_time_in_ms();
                     int c = wait_key_cv(1);
-                    b_disp = gettime_after_boot() - waitkey_start;
+                    b_disp = get_time_in_ms() - waitkey_start;
 
                     if (c == 10) {
                         if (frame_skip == 0) frame_skip = 60;
@@ -505,7 +505,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 #endif
             /* display end */
 
-            end_disp = gettime_after_boot();
+            end_disp = get_time_in_ms();
 
             d_disp = end_disp - start_disp; 
 
@@ -540,7 +540,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 #endif
                 show_img = det_img;
             }
-            cycle_end = gettime_after_boot();
+            cycle_end = get_time_in_ms();
         }
         --delay;
         if(delay < 0){
@@ -548,7 +548,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             //double after = get_wall_time();
             //float curr = 1./(after - before);
             double after = get_time_point();    // more accurate time measurements
-            double after_1 = gettime_after_boot();    
+            double after_1 = get_time_in_ms();    
             float curr = 1000000. / (after - before);
             float curr_1 = (after_1 - before_1);
             //fps = fps*0.9 + curr*0.1;  

@@ -1015,8 +1015,7 @@ void show_total_time();
 // gemm.h
 LIB_API void init_cpu();
 
-
-double gettime_after_boot();
+double get_time_in_ms();
 
 struct frame_data {
 	image frame;
