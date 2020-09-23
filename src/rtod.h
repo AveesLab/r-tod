@@ -4,7 +4,7 @@
 #include "image.h"
 
 #if (defined ZERO_SLACK)
-#define CYCLE_OFFSET 1000
+#define CYCLE_OFFSET 25 
 #else
 #define CYCLE_OFFSET 25
 #endif
@@ -35,6 +35,8 @@ extern "C" {
 #endif
 
 struct frame_data frame[3]; // v4l2 image data
+
+struct det_result det_res[3];
 
 double e_fetch_array[OBJ_DET_CYCLE_IDX];
 double b_fetch_array[OBJ_DET_CYCLE_IDX];

@@ -1,0 +1,6 @@
+classes = 10
+train  = /mnt/hdd1/darknet/0906/train_list.txt
+valid  = /mnt/hdd1/darknet/0808/BDD_8class_test.txt
+names = data/san10_FVL.names
+backup = /mnt/hdd1/darknet/0906/backup
+

@@ -60,6 +60,8 @@ extern double inter_frame_gap_sum = 0;
 extern double num_object_sum = 0;
 extern double trace_data_sum = 0;
 
+int inter_frame_index = 1;
+
 #ifndef ZERO_SLACK
 int contention_free = 1;
 #endif
@@ -71,6 +73,61 @@ extern double b_fetch_max = 0;
 
 int contention_free = 0;
 #endif
+
+#define OUT_PATH "/aveesSSD/jang/results/"
+
+int write_result_output()
+{
+    extern struct det_result det_res[3];
+
+    FILE *fp;
+    char file_path[100] = "";
+    char buf[256];
+    char *out_file;
+    static int exist = 0;
+
+    out_file = buf;
+
+    printf("count : %d\n", exist);
+    if(exist) inter_frame_index += det_res[display_index].frame_gap; 
+    else inter_frame_index = 1;
+    printf("count : %d\n", inter_frame_index);
+
+    sprintf(out_file, "%06d", inter_frame_index);
+
+    strcat(file_path, OUT_PATH);
+    strcat(file_path, out_file);
+    strcat(file_path, ".txt");
+
+    fp=fopen(file_path,"w+");
+
+    if (fp == NULL) 
+    {
+        /* make directory */
+        while(!exist){
+            int result;
+
+            result = mkdir(OUT_PATH, 0766);
+
+            if(result == 0) { 
+                exist = 1;
+
+                fp=fopen(file_path,"w+");
+            }
+        }
+    }
+    else exist = 1;
+    fprintf(fp, "%s,%s,%s,%s,%s\n", "name", "left", "top", "width", "height");
+
+    for(int i; i < num_object; i++){
+        fprintf(fp, "%s,%d,%d,%d,%d\n", det_res[display_index].name[i]
+                , det_res[display_index].box_left[i], det_res[display_index].box_top[i]
+                , det_res[display_index].box_width[i], det_res[display_index].box_height[i]);
+    }
+
+    fclose(fp);
+    return 1;
+}
 
 double gettime_after_boot()
 {
@@ -170,6 +227,8 @@ void *rtod_fetch_thread(void *ptr)
     else transfer_delay = .0; 
 
     inter_frame_gap = GET_IFG(frame[buff_index].frame_sequence, frame_sequence_tmp);
+
+    det_res[buff_index].frame_gap = inter_frame_gap;
 
     if(cnt >= (CYCLE_OFFSET - 5)){
         d_fetch = end_fetch - start_fetch;
@@ -307,14 +366,14 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     pthread_t fetch_thread;
     pthread_t inference_thread;
 
-#ifndef V4L2
-    ondemand = check_on_demand();
-
-    if(ondemand != 1) { 
-        fprintf(stderr, "ERROR : R-TOD needs on-demand capture.\n");
-        exit(0);
-    }
-#endif
+//#ifndef V4L2
+//    ondemand = check_on_demand();
+//
+//    if(ondemand != 1) { 
+//        fprintf(stderr, "ERROR : R-TOD needs on-demand capture.\n");
+//        exit(0);
+//    }
+//#endif
 
     printf("Object detector information:\n"
             "  Capture: \"%s\"\n"
@@ -459,6 +518,8 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
             if (!benchmark) draw_detections_cv_v3(show_img, local_dets, local_nboxes, demo_thresh, demo_names, demo_alphabet, demo_classes, demo_ext_output);
 
+            int c = write_result_output();
+
             draw_bbox_time = gettime_after_boot() - start_disp;
 
             free_detections(local_dets, local_nboxes);
@@ -484,9 +545,12 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
                 }
             }else{
+                printf("%d\n", inter_frame_index);
                 char buff[256];
-                sprintf(buff, "%s_%08d.jpg", prefix, count);
-                if(show_img) save_cv_jpg(show_img, buff);
+                char ext_file[256] = "/aveesSSD/jang/AlexeyAB/darknet/result_image/";
+                sprintf(buff, "%06d.jpg", inter_frame_index);
+                strcat(ext_file, buff);
+                if(show_img) save_cv_jpg(show_img, ext_file);
             }
 
             // if you run it with param -mjpeg_port 8090  then open URL in your web-browser: http://localhost:8090
@@ -608,7 +672,8 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             b_fetch_max = MAX(b_fetch_max, b_fetch);
         }
         else if(cnt == (CYCLE_OFFSET - 1)){
-            fetch_offset = (int)(s_min - e_fetch_max - b_fetch_max);
+            //fetch_offset = (int)(s_min - e_fetch_max - b_fetch_max);
+            fetch_offset = 0;
             printf("fetch_offset : %d\n", fetch_offset);
 
             measure = 0;

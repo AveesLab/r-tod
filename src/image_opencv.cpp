@@ -971,6 +971,8 @@ extern "C" {
             static int frame_id = 0;
             frame_id++;
             extern int num_object; // number of detections
+            extern int display_index;
+            extern struct det_result det_res[3];
             int k = 0;
 
             for (i = 0; i < num; ++i) {
@@ -987,11 +989,13 @@ extern "C" {
                             sprintf(buff, " (%2.0f%%)", dets[i].prob[j] * 100);
                             strcat(labelstr, buff);
                             printf("%s: %.0f%% ", names[j], dets[i].prob[j] * 100);
+                            det_res[display_index].name[i] = names[j];
                         }
                         else {
                             strcat(labelstr, ", ");
                             strcat(labelstr, names[j]);
                             printf(", %s: %.0f%% ", names[j], dets[i].prob[j] * 100);
+                            det_res[display_index].name[i] = names[j];
                         }
                     }
                 }
@@ -1079,6 +1083,15 @@ extern "C" {
                     //cvResetImageROI(copy_img);
 
                     cv::rectangle(*show_img, pt1, pt2, color, width, 8, 0);
+
+                    if (ext_output){
+                        extern int box_pos[20][4];
+
+                        det_res[display_index].box_left[i] = left;
+                        det_res[display_index].box_top[i] = top;
+                        det_res[display_index].box_width[i] = b.w*show_img->cols;
+                        det_res[display_index].box_height[i] = b.h*show_img->rows;
+                    }
                     if (ext_output)
                         printf("\t(left_x: %4.0f   top_y: %4.0f   width: %4.0f   height: %4.0f)\n",
                                 (float)left, (float)top, b.w*show_img->cols, b.h*show_img->rows);

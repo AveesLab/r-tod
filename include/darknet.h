@@ -1018,6 +1018,17 @@ LIB_API void init_cpu();
 
 double gettime_after_boot();
 
+int write_result_output();
+
+struct det_result {
+    char *name[20];
+    int box_left[20];
+    int box_top[20];
+    int box_width[20];
+    int box_height[20];
+    int frame_gap;
+};
+
 struct frame_data {
 	image frame;
 	image resize_frame;

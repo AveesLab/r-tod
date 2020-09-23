@@ -269,7 +269,6 @@ extern "C" {
         }
 
         /* On demand capture */
-
         if(-1 == xioctl(fd, VIDIOC_QBUF, &buf))
         {
             perror("Query Buffer");
@@ -311,9 +310,8 @@ extern "C" {
         printf("frame timestamp : %f\n", f->frame_timestamp);
         printf("frame sequence : %d\n", f->frame_sequence);
 #endif
-
-
         image im;
+
 #if (defined MJPEG)
         IplImage* frame;
 
@@ -379,7 +377,6 @@ extern "C" {
                 on_demand = 0;
                 size = 4;
         }
-
         //printf("%d %d\n", on_demand, size);
 
         return size;
