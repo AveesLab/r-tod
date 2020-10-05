@@ -8,7 +8,7 @@ More details
 # R-TOD: Real-Time Object Detector
 
 ### Installation ###
-* Clone R-TOD repository (Submodule: https://github.com/AveesLab/R-TOD)
+* Clone R-TOD repository (Submodule: https://github.com/AveesLab/OpenCV-3.3.1)
 ```
 $ git clone --recursive https://github.com/AveesLab/R-TOD
 ```
