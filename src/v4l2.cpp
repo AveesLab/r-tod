@@ -281,9 +281,9 @@ extern "C" {
         //    struct timeval tv = {0};
         tv.tv_sec = 2;
 
-        double select_start = gettime_after_boot();
+        double select_start = get_time_in_ms();
 
-        f->select = gettime_after_boot() - select_start;
+        f->select = get_time_in_ms() - select_start;
 
         if(-1 == xioctl(fd, VIDIOC_DQBUF, &buf))
         {
