@@ -197,10 +197,9 @@ void *rtod_inference_thread(void *ptr)
     mean_arrays(predictions, NFRAMES, l.outputs, avg);
     l.output = avg;
 
-#ifndef V4L2
-    cv_images[demo_index] = det_img;
-    det_img = cv_images[(demo_index + NFRAMES / 2 + 1) % NFRAMES];
-#endif
+    //cv_images[demo_index] = det_img; /* Detection image bug */
+    //det_img = cv_images[(demo_index + NFRAMES / 2 + 1) % NFRAMES]; /* Detection image bug */
+
     demo_index = (demo_index + 1) % NFRAMES;
 
 #ifdef V4L2
@@ -266,8 +265,8 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     }else{
         printf("Webcam index: %d\n", cam_index);
 #ifdef V4L2
-        char cam_dev[20] = "/dev/video";
-        char index[2];
+        char cam_dev[256] = "/dev/video";
+        char index[256];
         sprintf(index, "%d", cam_index);
         strcat(cam_dev, index);
         printf("cam dev : %s\n", cam_dev);
@@ -519,11 +518,11 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
                 free_image(det_s);
             }
 
+#ifdef ZERO_SLACK
             /* Change infer image for next object detection cycle*/
             det_img = in_img;
             det_s = in_s;
 
-#ifndef ZERO_SLACK
             rtod_inference_thread(0);
 #endif
 
@@ -540,6 +539,10 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 #endif
                 show_img = det_img;
             }
+#ifdef ZERO_SLACK
+            det_img = in_img;
+            det_s = in_s;
+#endif
             cycle_end = get_time_in_ms();
         }
         --delay;
