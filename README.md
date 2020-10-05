@@ -7,13 +7,20 @@ More details
 
 # R-TOD: Real-Time Object Detector
 
+### Installation ###
+* Clone R-TOD repository (Submodule: https://github.com/AveesLab/R-TOD)
+```
+$ git clone --recursive https://github.com/AveesLab/R-TOD
+```
+* Rebuild OpenCV: See **OpenCV rebuild** in https://github.com/AveesLab/OpenCV-3.3.1
+
 ### Compile using 'Make' ###
 * `V4L2=1`: Fetch image with On-demand capture using V4L2 ioctl without OpenCV library (0: Fetch image using OpenCV).
 * `ZERO_SLACK=1`: Use Zero-slack pipeline (0 means Contention-free pipeline).
 * `MEASUREMENT=1`: Measure delay (capture ~ display) and log to csv file (See [Measurement setup](#measurement-setup)).
 
 ### How to set On-demand capture
-* Build `V4L2=0`: See https://github.com/wonseok-Jang/OpenCV-3.3.1.
+* Build `V4L2=0`: See https://github.com/AveesLab/OpenCV-3.3.1.
 * Build `V4L2=1`: No setup required.
 
 ### Measurement setup ###
@@ -30,7 +37,7 @@ More details
 
 #### Original pipeline
 You can choose two capture method (Orignal capture & On-demand capture).
-* See **Image capture** in https://github.com/wonseok-Jang/OpenCV-3.3.1.
+* See **Image capture** in https://github.com/AveesLab/OpenCV-3.3.1.
 * **Original capture**: Orignal darknet with nothing modified.
 * **On-demand capture**: Remove unnecessary image queue.
 ```
