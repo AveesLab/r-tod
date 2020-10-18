@@ -43,7 +43,10 @@ $ ./darknet detector demo cfg/coco.data cfg weights
   weights: weights file
 ```
 ### +On-demand Capture
-* If you build with `V4L2=0`: See **Capture methods** in https://github.com/AveesLab/OpenCV-3.3.1.
+* If you build with `V4L2=0` 
+```
+$ export OPENCV_QLEN=0
+```
 * If you build with `V4L2=1`: No setup required.
 ```
 $ ./darknet detector demo cfg/coco.data cfg weights 
@@ -54,6 +57,7 @@ $ ./darknet detector demo cfg/coco.data cfg weights
 * **Zero-Slack Pipeline** needs **On-demand Capture**. 
 * Build with `ZERO_SLACK=1`.
 ```
+$ export OPENCV_QLEN=0
 $ ./darknet detector rtod cfg/coco.data cfg weights
        cfg: YOLO network configure file
    weights: weights file
@@ -62,6 +66,7 @@ $ ./darknet detector rtod cfg/coco.data cfg weights
 * **Contention-Free Pipeline** needs **On-demand Capture**. 
 * Build with `CONTENTION_FREE=1`.
 ```
+$ export OPENCV_QLEN=0
 $ ./darknet detector rtod cfg/coco.data cfg weights
        cfg: YOLO network configure file
    weights: weights file
