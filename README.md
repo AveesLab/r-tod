@@ -34,10 +34,6 @@ $ git clone --recursive https://github.com/AveesLab/R-TOD
 #define OBJ_DET_CYCLE_IDX     // Count of measurement
 ```
 
-# How to use On-demand capture
-* If you build with `V4L2=0`: See **Capture methods** in https://github.com/AveesLab/OpenCV-3.3.1.
-* If you build with `V4L2=1`: No setup required.
-
 # Usage 
 
 ### Original Darknet
@@ -47,14 +43,15 @@ $ ./darknet detector demo cfg/coco.data cfg weights
   weights: weights file
 ```
 ### +On-demand Capture
-* See [How to use On-demand capture](#how-to-use-on--demand-capture).
+* If you build with `V4L2=0`: See **Capture methods** in https://github.com/AveesLab/OpenCV-3.3.1.
+* If you build with `V4L2=1`: No setup required.
 ```
 $ ./darknet detector demo cfg/coco.data cfg weights 
       cfg: YOLO network configure file
   weights: weights file
 ```
 ### Zero-Slack Pipeline
-* **Zero-Slack Pipeline** needs **On-demand Capture**. See [How to use On-demand capture](#how-to-use-on--demand-capture).
+* **Zero-Slack Pipeline** needs **On-demand Capture**. 
 * Build with `ZERO_SLACK=1`.
 ```
 $ ./darknet detector rtod cfg/coco.data cfg weights
@@ -62,7 +59,7 @@ $ ./darknet detector rtod cfg/coco.data cfg weights
    weights: weights file
 ```
 ### Contention-Free Pipeline
-* **Contention-Free Pipeline** needs **On-demand Capture**. See [How to use On-demand capture](#how-to-use-on--demand-capture).
+* **Contention-Free Pipeline** needs **On-demand Capture**. 
 * Build with `CONTENTION_FREE=1`.
 ```
 $ ./darknet detector rtod cfg/coco.data cfg weights
