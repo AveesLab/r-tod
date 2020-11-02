@@ -251,7 +251,6 @@ extern "C" {
     int capture_image(struct frame_data *f, int fd)
     {
         enum v4l2_buf_type type;
-        pthread_t select_thread;
 
         memset(&buf, 0x00, sizeof(struct v4l2_buffer));
         buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -276,7 +275,7 @@ extern "C" {
         tv.tv_sec = 2;
         tv.tv_usec = 0;
 
-        double select_start = gettime_after_boot();
+        double select_start = get_time_in_ms();
 
         if(-1 == select(fd + 1, &fds, NULL, NULL, &tv))
 		{
@@ -284,7 +283,7 @@ extern "C" {
 			return -1;
 		}
 
-        f->select = gettime_after_boot() - select_start;
+        f->select = get_time_in_ms() - select_start;
 
         if(-1 == xioctl(fd, VIDIOC_DQBUF, &buf))
         {

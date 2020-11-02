@@ -77,7 +77,7 @@ void forward_network_gpu(network net, network_state state)
     //printf("\n");
     state.workspace = net.workspace;
     int i;
-    gpu_kernel_start = gettime_after_boot();
+    gpu_kernel_start = get_time_in_ms();
     for(i = 0; i < net.n; ++i){
         state.index = i;
         layer l = net.layers[i];
@@ -139,7 +139,7 @@ void forward_network_gpu(network net, network_state state)
             cvDestroyAllWindows();
         }
 */
-    if(l.type == REGION) e_infer_gpu = gettime_after_boot() - gpu_kernel_start; // v2
+    if(l.type == REGION) e_infer_gpu = get_time_in_ms() - gpu_kernel_start; // v2
     }
         //printf("detect in gpu : %f\n", e_infer_gpu);
 
@@ -654,7 +654,7 @@ float *get_network_output_layer_gpu(network net, int i)
     {
         extern double e_infer_gpu;
         cuda_pull_array(l.output_gpu, l.output, l.outputs*l.batch);
-        e_infer_gpu = gettime_after_boot() - gpu_kernel_start;
+        e_infer_gpu = get_time_in_ms() - gpu_kernel_start;
     }
     return l.output;
 }

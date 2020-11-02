@@ -37,6 +37,7 @@ signle_cam/
 *.csv
 *.zip
 result_image/
+revision/
 
 # OS Generated #
 .DS_Store*
