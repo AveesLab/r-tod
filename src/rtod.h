@@ -145,7 +145,7 @@ volatile int flag_exit;
 int letter_box;
 
 int get_rand_offset(int a, int b);
-double gettime_after_boot();
+double get_time_in_ms();
 int check_on_demand();
 void *rtod_fetch_thread(void *ptr);
 void *rtod_inference_thread(void *ptr);

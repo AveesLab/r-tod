@@ -454,9 +454,9 @@ extern "C" {
             else if (mat.channels() == 4) cv::cvtColor(mat, mat, cv::COLOR_RGBA2BGR);
             cv::namedWindow(name, cv::WINDOW_NORMAL);
             cv::imshow(name, mat);
-            waitkey_start = gettime_after_boot();
+            waitkey_start = get_time_in_ms();
             int c = cv::waitKey(1);
-            b_disp = gettime_after_boot() - waitkey_start;
+            b_disp = get_time_in_ms() - waitkey_start;
 
             free_image(copy);
 
@@ -685,9 +685,6 @@ extern "C" {
                     f->frame_timestamp = cpp_cap.get(CV_CAP_PROP_POS_MSEC);
                     f->frame_sequence = cpp_cap.get(CV_CAP_PROP_POS_FRAMES);
                     f->select = cpp_cap.get(CV_CAP_PROP_SELECT);
-
-                    //printf("Image time stamp : %f\n", f->frame_timestamp);
-
                 }
                 else std::cout << " Video-stream stopped! \n";
             }
