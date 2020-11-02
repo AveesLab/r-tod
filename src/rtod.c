@@ -62,6 +62,8 @@ extern double trace_data_sum = 0;
 
 int inter_frame_index = 1;
 
+int *fd_handler = NULL;
+
 #ifndef ZERO_SLACK
 int contention_free = 1;
 #endif
@@ -197,7 +199,11 @@ void *rtod_fetch_thread(void *ptr)
         in_s = get_image_from_stream_letterbox(cap, net.w, net.h, net.c, &in_img, dont_close_stream);
     else{
 #ifdef V4L2
-        frame[buff_index].frame = capture_image(&frame[buff_index]);
+		if(capture_image(&frame[buff_index], *fd_handler) == -1)
+		{
+			perror("Fail to capture image");
+			exit(0);
+		}
         letterbox_image_into(frame[buff_index].frame, net.w, net.h, frame[buff_index].resize_frame);
         //frame[buff_index].resize_frame = letterbox_image(frame[buff_index].frame, net.w, net.h);
         //show_image_cv(frame[buff_index].resize_frame,"im");
@@ -293,7 +299,7 @@ void *rtod_display_thread(void *ptr)
 
 void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
         int frame_skip, char *prefix, char *out_filename, int mjpeg_port, int json_port, int dont_show, int ext_output, int letter_box_in, int time_limit_sec, char *http_post_host,
-        int benchmark, int benchmark_layers)
+        int benchmark, int benchmark_layers, int w, int h, int fps)
 {
     letter_box = letter_box_in;
     in_img = det_img = show_img = NULL;
@@ -316,12 +322,15 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     calculate_binary_weights(net);
     srand(2222222);
 
-    char capture[2][20] = {"Original capture", "On-demand capture"};
-    char pipeline[2][20] = {"Zero-slack", "Contention free"};
+	int img_w = w;
+	int img_h = h;
+	int cam_fps = fps;
+    char capture[2][256] = {"Original capture", "On-demand capture"};
+    char pipeline[2][256] = {"Zero-slack", "Contention free"};
 
     if(filename){
         printf("video file: %s\n", filename);
-        cap = get_capture_video_stream(filename);
+        cap = get_capture_video_stream_with_prop(filename, img_w, img_h, cam_fps);
     }else{
         printf("Webcam index: %d\n", cam_index);
 #ifdef V4L2
@@ -331,10 +340,8 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         strcat(cam_dev, index);
         printf("cam dev : %s\n", cam_dev);
 
-        int frames = 30;
-        int w = 640;
-        int h = 480;
-        if(open_device(cam_dev, frames, w, h) < 0)
+        fd_handler = open_device(cam_dev, cam_fps, img_w, img_h);
+        if(fd_handler ==  NULL)
         {
             error("Couldn't connect to webcam.\n");
         }
@@ -366,14 +373,14 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     pthread_t fetch_thread;
     pthread_t inference_thread;
 
-//#ifndef V4L2
-//    ondemand = check_on_demand();
-//
-//    if(ondemand != 1) { 
-//        fprintf(stderr, "ERROR : R-TOD needs on-demand capture.\n");
-//        exit(0);
-//    }
-//#endif
+#ifndef V4L2
+    ondemand = check_on_demand();
+
+    if(ondemand != 1) { 
+        fprintf(stderr, "ERROR : R-TOD needs on-demand capture.\n");
+        exit(0);
+    }
+#endif
 
     printf("Object detector information:\n"
             "  Capture: \"%s\"\n"
@@ -385,7 +392,11 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     //printf("ondemand : %d\n", ondemand);
 
 #ifdef V4L2
-    frame[0].frame = capture_image(&frame[buff_index]);
+	if(capture_image(&frame[buff_index], *fd_handler) == -1)
+	{
+		perror("Fail to capture image");
+		exit(0);
+	}
     frame[0].resize_frame = letterbox_image(frame[0].frame, net.w, net.h);
 
     frame[1].frame = frame[0].frame;

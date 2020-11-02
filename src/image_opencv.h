@@ -67,6 +67,7 @@ void release_video_writer(write_cv **output_video_writer);
 //int show_image_cv(image im, const char* name, int ms);
 
 // Video Capture
+cap_cv* get_capture_video_stream_with_prop(const char *path, int w, int h, int fps);
 cap_cv* get_capture_video_stream(const char *path);
 cap_cv* get_capture_webcam(int index);
 cap_cv* get_capture_webcam_set_v4l2(int index, int opencv_buffer_size);

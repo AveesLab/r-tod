@@ -12,7 +12,7 @@
 /* Measurement */
 #define MEASUREMENT_PATH "measure"
 #define MEASUREMENT_FILE "/measure.csv"
-#define OBJ_DET_CYCLE_IDX 1000
+#define OBJ_DET_CYCLE_IDX 500
 
 #define QLEN 4
 #define NFRAMES 3
@@ -28,7 +28,7 @@
 extern "C" {
 #endif
     void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
-            int frame_skip, char *prefix, char *out_filename, int mjpeg_port, int json_port, int dont_show, int ext_output, int letter_box_in, int time_limit_sec, char *http_post_host, int benchmark, int benchmark_layers);
+            int frame_skip, char *prefix, char *out_filename, int mjpeg_port, int json_port, int dont_show, int ext_output, int letter_box_in, int time_limit_sec, char *http_post_host, int benchmark, int benchmark_layers, int w, int h, int fps);
 
 #ifdef __cplusplus
 }
