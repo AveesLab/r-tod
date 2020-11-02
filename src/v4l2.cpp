@@ -29,11 +29,8 @@
 //#define MJPEG 
 #define YUYV 
 
-int fd;
-fd_set fds;
 struct timeval tv = {0};
-
-volatile static int ret_select = -1;
+struct v4l2_buffer buf;
 
 using namespace cv;
 
@@ -185,9 +182,7 @@ extern "C" {
     /* Memory mapping */
     int init_mmap(int fd)
     {
-        struct v4l2_buffer buf = {0};
         struct v4l2_requestbuffers req = {0};
-
         int ret;
 
         req.count = DEFAULT_V4L_QLEN;
@@ -215,10 +210,12 @@ extern "C" {
             buf.memory = V4L2_MEMORY_MMAP;
             buf.index = i;
 
-            ret = ioctl(fd, VIDIOC_QUERYBUF, &buf);
-
-            buffers[i].start = mmap(NULL, buf.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, buf.m.offset);
-
+            ret = xioctl(fd, VIDIOC_QUERYBUF, &buf);
+			if (ret < 0) {
+				perror("QUERYBUF");
+				return -1;
+			}
+			buffers[i].start = mmap(NULL, buf.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, buf.m.offset);
             buffers[i].length = buf.length;
         }
 
@@ -239,7 +236,7 @@ extern "C" {
         parm.parm.capture.timeperframe.denominator = fps;
 
         if(xioctl(fd, VIDIOC_S_PARM, &parm) < 0) {  
-            fprintf(stderr, "VIDEOIO ERROR: V4L: Unable to set camera FPS\n");
+            fprintf(stderr, "VIDEOIO ERROR: V4L: Unable to set %d fps\n", fps);
             return -1;
         }
 
@@ -251,9 +248,8 @@ extern "C" {
     }
 
     /* Capture */
-    image capture_image(struct frame_data *f)
+    int capture_image(struct frame_data *f, int fd)
     {
-        struct v4l2_buffer buf;
         enum v4l2_buf_type type;
         pthread_t select_thread;
 
@@ -261,36 +257,42 @@ extern "C" {
         buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         buf.memory = V4L2_MEMORY_MMAP;
 
-        type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-
         if(-1 == xioctl(fd, VIDIOC_STREAMON, &buf.type))
         {
             perror("Start Capture");
+			return -1;
         }
 
         /* On demand capture */
         if(-1 == xioctl(fd, VIDIOC_QBUF, &buf))
         {
             perror("Query Buffer");
+			return -1;
         }
 
-        //    fd_set fds;
+		fd_set fds;
         FD_ZERO(&fds);
         FD_SET(fd, &fds);
-        //    struct timeval tv = {0};
         tv.tv_sec = 2;
+        tv.tv_usec = 0;
 
         double select_start = gettime_after_boot();
+
+        if(-1 == select(fd + 1, &fds, NULL, NULL, &tv))
+		{
+			perror("Select");
+			return -1;
+		}
 
         f->select = gettime_after_boot() - select_start;
 
         if(-1 == xioctl(fd, VIDIOC_DQBUF, &buf))
         {
             perror("Retrieving Frame");
+			return -1;
         }
 
         /* Load frame data */
-
         f->frame_timestamp = (double)buf.timestamp.tv_sec*1000 
             + (double)buf.timestamp.tv_usec*0.001;
 
@@ -298,8 +300,8 @@ extern "C" {
 
         f->length = buf.length;
 
-        //    printf("got data in buff %d, len=%d, flags=0x%X, seq=%d, used=%d)\n",
-        //            buf.index, buf.length, buf.flags, buf.sequence, buf.bytesused);
+//    printf("got data in buff %d, len=%d, flags=0x%X, seq=%d, used=%d)\n",
+//            buf.index, buf.length, buf.flags, buf.sequence, buf.bytesused);
 
 #ifdef DEBUG
         printf("got data in buff %d, len=%d, flags=0x%X, seq=%d, used=%d)\n",
@@ -332,7 +334,9 @@ extern "C" {
 
         im = matImg_to_image(preview);
 #endif
-        return im; /* return Image as darknet image type */
+		f->frame = im;
+
+        return 1; /* return Image as darknet image type */
     }
 
     /* Check Q size defined in environment variable */
@@ -383,16 +387,16 @@ extern "C" {
     }
 
     /* Open camera device */
-    int open_device(char *cam_dev, int fps, int w, int h)
+    int *open_device(char *cam_dev, int fps, int w, int h)
     {
-        int ret;
+		static int fd;
 
         fd = open(cam_dev, O_RDWR | O_NONBLOCK, 0);
-
         if (fd == -1)
         {
             fprintf(stderr, "VIDEOIO ERROR : Opening video device");
-            return -1;
+            //return -1;
+            return NULL;
         }
 
         print_caps(fd, w, h);
@@ -400,16 +404,19 @@ extern "C" {
         if (set_framerate(fd, fps) < 0)
         {
             fprintf(stderr, "VIDEOIO ERROR : Unable to set camera FPS\n");
-            return -1;
+            //return -1;
+            return NULL;
         }
 
         if(init_mmap(fd) == -1)
         {
             fprintf(stderr, "VIDEOIO ERROR : Fail memory mapping");
-            return -1;
+            //return -1;
+            return NULL;
         }
 
-        return 1;
+        //return 1;
+		return &fd;
     }
 }
 
