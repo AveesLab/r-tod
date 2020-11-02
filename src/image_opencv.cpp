@@ -584,20 +584,6 @@ extern "C" {
     // Video Capture
     // ====================================================================
 
-    extern "C" cap_cv* get_capture_video_stream_with_prop(const char *path, int w, int h, int fps) {
-        cv::VideoCapture* cap = NULL;
-        try {
-            cap = new cv::VideoCapture(path);
-			if(w) cap->set(CV_CAP_PROP_FRAME_WIDTH, w);
-			if(h) cap->set(CV_CAP_PROP_FRAME_HEIGHT, w);
-			if(fps) cap->set(CV_CAP_PROP_FPS, w);
-        }
-        catch (...) {
-            cerr << " OpenCV exception: video-stream " << path << " can't be opened! \n";
-        }
-        return (cap_cv*)cap;
-    }
-
     extern "C" cap_cv* get_capture_video_stream(const char *path) {
         cv::VideoCapture* cap = NULL;
         try {
@@ -610,13 +596,26 @@ extern "C" {
     }
     // ----------------------------------------
 
+    extern "C" cap_cv* get_capture_webcam_with_prop(int index, int w, int h, int fps)
+    {
+        cv::VideoCapture* cap = NULL;
+        try {
+            cap = new cv::VideoCapture(index);
+			if(w) cap->set(CV_CAP_PROP_FRAME_WIDTH, w);
+			if(h) cap->set(CV_CAP_PROP_FRAME_HEIGHT, h);
+			if(fps) cap->set(CV_CAP_PROP_FPS, fps);
+        }
+        catch (...) {
+            cerr << " OpenCV exception: Web-camera " << index << " can't be opened! \n";
+        }
+        return (cap_cv*)cap;
+    }
+
     extern "C" cap_cv* get_capture_webcam(int index)
     {
         cv::VideoCapture* cap = NULL;
         try {
             cap = new cv::VideoCapture(index);
-            //cap->set(CV_CAP_PROP_FRAME_WIDTH, 1280);
-            //cap->set(CV_CAP_PROP_FRAME_HEIGHT, 960);
         }
         catch (...) {
             cerr << " OpenCV exception: Web-camera " << index << " can't be opened! \n";

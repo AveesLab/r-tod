@@ -243,7 +243,7 @@ void *rtod_display_thread(void *ptr)
 
 void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int cam_index, const char *filename, char **names, int classes,
         int frame_skip, char *prefix, char *out_filename, int mjpeg_port, int json_port, int dont_show, int ext_output, int letter_box_in, int time_limit_sec, char *http_post_host,
-        int benchmark, int benchmark_layers, int w, int h, int fps)
+        int benchmark, int benchmark_layers, int w, int h, int cam_fps)
 {
     letter_box = letter_box_in;
     in_img = det_img = show_img = NULL;
@@ -268,13 +268,12 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
 	int img_w = w;
 	int img_h = h;
-	int cam_fps = fps;
-    char capture[2][256] = {"Original capture", "On-demand capture"};
+	int cam_frame_rate= cam_fps;
     char pipeline[2][256] = {"Zero-slack", "Contention free"};
 
     if(filename){
         printf("video file: %s\n", filename);
-        cap = get_capture_video_stream_with_prop(filename, img_w, img_h, cam_fps);
+        cap = get_capture_video_stream(filename);
     }else{
         printf("Webcam index: %d\n", cam_index);
 #ifdef V4L2
@@ -284,14 +283,13 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         strcat(cam_dev, index);
         printf("cam dev : %s\n", cam_dev);
 
-        fd_handler = open_device(cam_dev, cam_fps, img_w, img_h);
+        fd_handler = open_device(cam_dev, cam_frame_rate, img_w, img_h);
         if(fd_handler ==  NULL)
         {
             error("Couldn't connect to webcam.\n");
         }
 #else
-        cap = get_capture_webcam(cam_index);
-
+        cap = get_capture_webcam_with_prop(cam_index, img_w, img_h, cam_frame_rate);
         if (!cap) {
 #ifdef WIN32
             printf("Check that you have copied file opencv_ffmpeg340_64.dll to the same directory where is darknet.exe \n");
@@ -327,9 +325,8 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 #endif
 
     printf("Object detector information:\n"
-            "  Capture: \"%s\"\n"
+            "  Capture: \"On-demand capture\"\n"
             "  Pipeline architecture: \"%s\"\n",
-            capture[ondemand],
             pipeline[contention_free]);
     printf("========================\n");
 
@@ -348,7 +345,6 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
     frame[2].frame = frame[0].frame;
     frame[2].resize_frame = letterbox_image(frame[0].frame, net.w, net.h);
-
 #else
     rtod_fetch_thread(0);
     det_img = in_img;
@@ -425,7 +421,6 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             /* Fork Inference thread */
             if(pthread_create(&inference_thread, 0, rtod_inference_thread, 0)) error("Thread creation failed");
 #endif
-
             /* display thread */
 
             printf("\033[2J");
@@ -536,7 +531,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
                 free_image(det_s);
             }
 
-#ifdef ZERO_SLACK
+#ifndef ZERO_SLACK
             /* Change infer image for next object detection cycle*/
             det_img = in_img;
             det_s = in_s;
