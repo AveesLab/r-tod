@@ -4,7 +4,7 @@
 #include "image.h"
 
 #if (defined ZERO_SLACK)
-#define CYCLE_OFFSET 25 
+#define CYCLE_OFFSET 1000
 #else
 #define CYCLE_OFFSET 25
 #endif
@@ -12,7 +12,7 @@
 /* Measurement */
 #define MEASUREMENT_PATH "measure"
 #define MEASUREMENT_FILE "/measure.csv"
-#define OBJ_DET_CYCLE_IDX 500
+#define OBJ_DET_CYCLE_IDX 1000
 
 #define QLEN 4
 #define NFRAMES 3
@@ -89,6 +89,7 @@ int cycle_index;
 double cycle_array[QLEN];
 int ondemand;
 int num_object;
+int measure;
 
 int frame_sequence_tmp;
 int inter_frame_gap;
@@ -144,9 +145,11 @@ mat_cv* show_img;
 volatile int flag_exit;
 int letter_box;
 
-int get_rand_offset(int a, int b);
-double get_time_in_ms();
-int check_on_demand();
+void push_data(void);
+int get_fetch_offset(void);
+int write_result(void);
+double get_time_in_ms(void);
+int check_on_demand(void);
 void *rtod_fetch_thread(void *ptr);
 void *rtod_inference_thread(void *ptr);
 void *rtod_display_thread(void *ptr);
