@@ -326,8 +326,6 @@ void *rtod_fetch_thread(void *ptr)
 
     inter_frame_gap = GET_IFG(frame[buff_index].frame_sequence, frame_sequence_tmp);
 
-    det_res[buff_index].frame_gap = inter_frame_gap;
-
     if(cnt >= (CYCLE_OFFSET - 5)){
         d_fetch = end_fetch - start_fetch;
         b_fetch = frame[buff_index].select;
@@ -416,8 +414,18 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 	int img_w = w;
 	int img_h = h;
 	int cam_frame_rate= cam_fps;
-    char pipeline[2][256] = {"Zero-slack", "Contention free"};
-
+    char *pipeline = NULL;
+#if (defined ZERO_SLACK & defined CONTENTION_FREE)
+    fprintf(stderr, "ERROR: Set either ZERO_SLACK or CONTENTION_FREE in Makefile\n");
+    exit(0);
+#elif (defined ZERO_SLACK)
+    pipeline = "ZERO-SLACK";
+#elif (defined CONTENTION_FREE) 
+    pipeline = "CONTENTION-FREE";
+#else
+    fprintf(stderr, "ERROR: Set either ZERO_SLACK or CONTENTION_FREE in Makefile\n");
+    exit(0);
+#endif
     if(filename){
         printf("video file: %s\n", filename);
         cap = get_capture_video_stream(filename);
@@ -470,11 +478,10 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
         exit(0);
     }
 #endif
-
-    printf("Object detector information:\n"
+    printf("OBJECT DETECTOR INFORMATION:\n"
             "  Capture: \"On-demand capture\"\n"
             "  Pipeline architecture: \"%s\"\n",
-            pipeline[contention_free]);
+            pipeline);
     printf("========================\n");
 
     //printf("ondemand : %d\n", ondemand);
@@ -552,9 +559,12 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
             /* Image index */
             display_index = (buff_index + 1) %3;
             detect_index = (buff_index + 2) %3;
-#else
+#elif (defined CONTENTION_FREE)
             display_index = (buff_index + 2) %3;
             detect_index = (buff_index) %3;
+#else
+    fprintf(stderr, "ERROR: Set either ZERO_SLACK or CONTENTION_FREE in Makefile\n");
+    exit(0);
 #endif
             const float nms = .45;    // 0.4F
             int local_nboxes = nboxes;
@@ -571,7 +581,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
 
             printf("\033[2J");
             printf("\033[1;1H");
-#if (defined ZERO_SLACK)
+#ifdef ZERO_SLACK
             if(measure) printf("Measuring...\n");
 #endif
             printf("\nFPS:%.1f \t AVG_FPS:%.1f\n", fps, avg_fps);
@@ -674,7 +684,7 @@ void rtod(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
                 free_image(det_s);
             }
 
-#ifndef ZERO_SLACK
+#ifdef CONTENTION_FREE 
             /* Change infer image for next object detection cycle*/
             det_img = in_img;
             det_s = in_s;
