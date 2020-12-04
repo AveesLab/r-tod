@@ -24,10 +24,6 @@ $ git clone --recursive https://github.com/AveesLab/R-TOD
 * `CONTENTION_FREE=1`: Use Contention-Free Pipeline method
 * `MEASUREMENT=1`: Measure delay (capture ~ display) and log to csv file (See [Measurement setup](#measurement-setup)).
 
-# How to use On-demand capture
-* If you build with `V4L2=0`: See **Capture methods** in https://github.com/AveesLab/OpenCV-3.3.1.
-* If you build with `V4L2=1`: No setup required.
-
 # Measurement setup 
 * If you build with `MEASUREMENT=0`, application will not stop until terminated by user.
 * In `src/rtod.h`, you can modify measurement setup.
@@ -37,6 +33,10 @@ $ git clone --recursive https://github.com/AveesLab/R-TOD
 #define MEASUREMENT_FILE      // Measurement file name
 #define OBJ_DET_CYCLE_IDX     // Count of measurement
 ```
+
+# How to use On-demand capture
+* If you build with `V4L2=0`: See **Capture methods** in https://github.com/AveesLab/OpenCV-3.3.1.
+* If you build with `V4L2=1`: No setup required.
 
 # Usage 
 
