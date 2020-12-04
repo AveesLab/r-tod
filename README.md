@@ -1,30 +1,35 @@
-# Yolo-v4 and Yolo-v3/v2 for Windows and Linux
-### (neural network for object detection) - Tensor Cores can be used on [Linux](https://github.com/AlexeyAB/darknet#how-to-compile-on-linux) and [Windows](https://github.com/AlexeyAB/darknet#how-to-compile-on-windows-using-cmake-gui)
+# R-TOD: Real-Time Object Detector with Minimized End-to-End Delay for Autonomous Driving
+### Hardware
+* Nvidia Jetson AGX Xavier
+* Logitech C930e USB camera
+### Software
+* Ubuntu 18.04 with JetPack-4.2.2
+* OpenCV-3.3.1
+* CUDA 10.0
 
-More details
+# More details
 * http://pjreddie.com/darknet/yolo/
 * https://github.com/AlexeyAB/darknet
 
-# R-TOD: Real-Time Object Detector
-
-### Installation ###
-* Clone R-TOD repository (Submodule: https://github.com/AveesLab/OpenCV-3.3.1)
+# Installation 
+* Clone R-TOD (Submodule: https://github.com/AveesLab/OpenCV-3.3.1)
 ```
 $ git clone --recursive https://github.com/AveesLab/R-TOD
 ```
-* Rebuild OpenCV: See **OpenCV rebuild** in https://github.com/AveesLab/OpenCV-3.3.1
+* To use **On-demand Capture** with OpenCV, you don't need any modification. Just build it. See **OpenCV rebuild** in https://github.com/AveesLab/OpenCV-3.3.1.
 
-### Compile using 'Make' ###
-* `V4L2=1`: Fetch image with On-demand capture using V4L2 ioctl without OpenCV library (0: Fetch image using OpenCV).
-* `ZERO_SLACK=1`: Use Zero-slack pipeline (0 means Contention-free pipeline).
+# Compile using 'Make' 
+* `V4L2=1`: Fetch image with On-demand capture method using V4L2 ioctl without OpenCV library (0: Fetch image using OpenCV).
+* `ZERO_SLACK=1`: Use Zero-Slack Pipeline method
+* `CONTENTION_FREE=1`: Use Contention-Free Pipeline method
 * `MEASUREMENT=1`: Measure delay (capture ~ display) and log to csv file (See [Measurement setup](#measurement-setup)).
 
-### How to set On-demand capture
-* Build `V4L2=0`: See https://github.com/AveesLab/OpenCV-3.3.1.
-* Build `V4L2=1`: No setup required.
+# How to use On-demand capture
+* If you build with `V4L2=0`: See **Capture methods** in https://github.com/AveesLab/OpenCV-3.3.1.
+* If you build with `V4L2=1`: No setup required.
 
-### Measurement setup ###
-* If you build with `MEASUREMENT=0`, never stop until terminated by user.
+# Measurement setup 
+* If you build with `MEASUREMENT=0`, application will not stop until terminated by user.
 * In `src/rtod.h`, you can modify measurement setup.
 ```
 /* Measurement */
@@ -33,31 +38,47 @@ $ git clone --recursive https://github.com/AveesLab/R-TOD
 #define OBJ_DET_CYCLE_IDX     // Count of measurement
 ```
 
-### Usage ###
+# Usage 
 
-#### Original pipeline
-You can choose two capture method (Orignal capture & On-demand capture).
-* See **Image capture** in https://github.com/AveesLab/OpenCV-3.3.1.
-* **Original capture**: Orignal darknet with nothing modified.
-* **On-demand capture**: Remove unnecessary image queue.
+### Original Darknet
 ```
 $ ./darknet detector demo cfg/coco.data cfg weights 
-     cfg : path to yolo network configure file
-  weights: path to weights file
+      cfg: YOLO network configure file
+  weights: weights file
 ```
-#### Zero-slack pipeline
-* See [How to set On-demand capture](#how-to-set-on--demand-capture).
-* Compile with `ZERO_SLACK=1`.
+### +On-demand Capture
+* See [How to use On-demand capture](#how-to-use-on--demand-capture).
+```
+$ ./darknet detector demo cfg/coco.data cfg weights 
+      cfg: YOLO network configure file
+  weights: weights file
+```
+### Zero-Slack Pipeline
+* **Zero-Slack Pipeline** needs **On-demand Capture**. See [How to use On-demand capture](#how-to-use-on--demand-capture).
+* Build with `ZERO_SLACK=1`.
 ```
 $ ./darknet detector rtod cfg/coco.data cfg weights
-      cfg : path to yolo network configure file
-      weights: path to weights file
+       cfg: YOLO network configure file
+   weights: weights file
 ```
-#### Contention-free pipeline
-* See [How to set On-demand capture](#how-to-set-on--demand-capture).
-* Compile with `ZERO_SLACK=0`.
+### Contention-Free Pipeline
+* **Contention-Free Pipeline** needs **On-demand Capture**. See [How to use On-demand capture](#how-to-use-on--demand-capture).
+* Build with `CONTENTION_FREE=1`.
 ```
 $ ./darknet detector rtod cfg/coco.data cfg weights
-      cfg : path to yolo network configure file
-   weights: path to weights file
+       cfg: YOLO network configure file
+   weights: weights file
+```
+
+# Citation
+The paper can be found [here](https://arxiv.org/pdf/2011.06372.pdf). For citation, please use the following Bibtex.
+```
+@misc{jang2020rtod,
+      title={R-TOD: Real-Time Object Detector with Minimized End-to-End Delay for Autonomous Driving}, 
+      author={Wonseok Jang and Hansaem Jeong and Kyungtae Kang and Nikil Dutt and Jong-Chan Kim},
+      year={2020},
+      eprint={2011.06372},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
 ```
