@@ -27,6 +27,7 @@
 #include <opencv2/core/types.hpp>
 #include <opencv2/videoio/videoio.hpp>
 #include <opencv2/imgcodecs/imgcodecs.hpp>
+#include <opencv2/imgproc/imgproc_c.h>
 #endif
 
 // OpenCV includes for OpenCV 2.x
@@ -601,9 +602,9 @@ extern "C" {
         cv::VideoCapture* cap = NULL;
         try {
             cap = new cv::VideoCapture(index);
-			if(w) cap->set(CV_CAP_PROP_FRAME_WIDTH, w);
-			if(h) cap->set(CV_CAP_PROP_FRAME_HEIGHT, h);
-			if(fps) cap->set(CV_CAP_PROP_FPS, fps);
+			if(w) cap->set(cv::CAP_PROP_FRAME_WIDTH, w);
+			if(h) cap->set(cv::CAP_PROP_FRAME_HEIGHT, h);
+			if(fps) cap->set(cv::CAP_PROP_FPS, fps);
         }
         catch (...) {
             cerr << " OpenCV exception: Web-camera " << index << " can't be opened! \n";
@@ -681,10 +682,10 @@ extern "C" {
                 {
                     cpp_cap >> *mat;
 
-                    f->frame_timestamp = cpp_cap.get(CV_CAP_PROP_POS_MSEC);
-                    f->frame_sequence = cpp_cap.get(CV_CAP_PROP_POS_FRAMES);
+                    f->frame_timestamp = cpp_cap.get(cv::CAP_PROP_POS_MSEC);
+                    f->frame_sequence = cpp_cap.get(cv::CAP_PROP_POS_FRAMES);
 #ifndef V4L2
-                    f->select = cpp_cap.get(CV_CAP_PROP_SELECT);
+                    f->select = cpp_cap.get(cv::CAP_PROP_SELECT);
 #endif
                 }
                 else std::cout << " Video-stream stopped! \n";

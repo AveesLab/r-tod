@@ -7,7 +7,7 @@ OPENMP=0
 LIBSO=0
 ZED_CAMERA=0 # ZED SDK 3.0 and above
 ZED_CAMERA_v2_8=0 # ZED SDK 2.X
-V4L2=0
+V4L2=1
 ZERO_SLACK=0
 CONTENTION_FREE=1
 MEASUREMENT=1
@@ -34,7 +34,7 @@ OS := $(shell uname)
 # ARCH= -gencode arch=compute_75,code=[sm_75,compute_75]
 
 # Jetson XAVIER
- ARCH= -gencode arch=compute_72,code=[sm_72,compute_72]
+# ARCH= -gencode arch=compute_72,code=[sm_72,compute_72]
 
 # GTX 1080, GTX 1070, GTX 1060, GTX 1050, GTX 1030, Titan Xp, Tesla P40, Tesla P4
 # ARCH= -gencode arch=compute_61,code=sm_61 -gencode arch=compute_61,code=compute_61
@@ -46,7 +46,7 @@ OS := $(shell uname)
 # ARCH= -gencode arch=compute_53,code=[sm_53,compute_53]
 
 # For Jetson Tx2 or Drive-PX2 uncomment:
-# ARCH= -gencode arch=compute_62,code=[sm_62,compute_62]
+ARCH= -gencode arch=compute_62,code=[sm_62,compute_62]
 
 
 VPATH=./src/
