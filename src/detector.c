@@ -1951,6 +1951,7 @@ void run_detector(int argc, char **argv)
         free_list_contents_kvp(options);
         free_list(options);
     }
+/*
     else if (0 == strcmp(argv[2], "rtod")) {
         list *options = read_data_cfg(datacfg);
         int classes = option_find_int(options, "classes", 20);
@@ -1965,6 +1966,7 @@ void run_detector(int argc, char **argv)
         free_list_contents_kvp(options);
         free_list(options);
     }
+*/
     else printf(" There isn't such command: %s", argv[2]);
 
     if (gpus && gpu_list && ngpus > 1) free(gpus);

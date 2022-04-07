@@ -124,7 +124,7 @@ network net;
 image in_s ;
 image det_s;
 
-cap_cv *cap;
+mat_cv *cap;
 float fps;
 float demo_thresh;
 int demo_ext_output;
